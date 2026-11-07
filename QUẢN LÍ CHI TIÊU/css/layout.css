@@ -1,0 +1,140 @@
+/* =========================================================
+   LAYOUT.CSS - CUTE BUDGET LAYOUT WITH ADVANCED ANIMATIONS
+   ========================================================= */
+
+:root {
+  --bg: #f8fafc; 
+  --surface: #ffffff; 
+  --text: #0f172a; 
+  --muted: #64748b; 
+  --line: #f1f5f9;
+  --line-strong: #e2e8f0;
+
+  --primary: #10b981; 
+  --primary-light: #ecfdf5;
+  --primary-2: #06b6d4; 
+  --danger: #f43f5e; 
+  --danger-light: #fff1f2;
+  --warn: #f59e0b;
+  
+  --radius-sm: 14px;
+  --radius: 22px; 
+  --radius-lg: 28px;
+  --shadow: 0 10px 30px -4px rgba(0, 0, 0, 0.04), 0 4px 10px -2px rgba(0, 0, 0, 0.02); 
+
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+}
+
+* { box-sizing: border-box; }
+html { -webkit-tap-highlight-color: transparent; scroll-behavior: smooth; }
+[hidden] { display: none !important; }
+
+body {
+  margin: 0; 
+  min-height: 100vh;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--text);
+  background-color: var(--bg);
+  background-image: 
+    radial-gradient(circle at 90% 0%, rgba(6, 182, 212, 0.05) 0%, transparent 40%),
+    radial-gradient(circle at 10% 20%, rgba(16, 185, 129, 0.06) 0%, transparent 45%);
+  background-attachment: fixed;
+  padding-bottom: 100px;
+  overflow-x: hidden;
+}
+
+.fx-layer {
+  position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+  pointer-events: none; z-index: 999999; overflow: hidden;
+}
+
+.splash-screen {
+  position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 100000; overflow: hidden; opacity: 1; transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.splash-screen.fade-out {
+  opacity: 0; pointer-events: none;
+}
+.falling-container {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;
+}
+.falling-item {
+  position: absolute; top: -60px; font-size: 2.2rem;
+  animation: fallDown linear infinite; opacity: 0.85; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3));
+}
+@keyframes fallDown {
+  0% { transform: translateY(0) rotate(0deg); opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { transform: translateY(105vh) rotate(360deg); opacity: 0; }
+}
+.splash-card {
+  text-align: center; color: #fff; z-index: 2; padding: 32px;
+  background: rgba(255, 255, 255, 0.07); backdrop-filter: blur(16px);
+  border-radius: var(--radius-lg); border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 20px 40px rgba(0,0,0,0.4); animation: popUp 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+}
+@keyframes popUp {
+  0% { transform: scale(0.7); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.splash-logo { font-size: 4rem; margin-bottom: 8px; filter: drop-shadow(0 6px 16px rgba(16,185,129,0.5)); }
+.splash-title { margin: 0; font-size: 1.8rem; font-weight: 800; letter-spacing: -0.5px; }
+.splash-sub { margin: 6px 0 20px; font-size: 0.88rem; color: #94a3b8; font-weight: 600; }
+.splash-loader {
+  width: 140px; height: 5px; background: rgba(255,255,255,0.15); border-radius: 99px;
+  margin: 0 auto; overflow: hidden; position: relative;
+}
+.splash-loader::after {
+  content: ''; position: absolute; top: 0; left: -50%; width: 50%; height: 100%;
+  background: linear-gradient(90deg, var(--primary), var(--primary-2));
+  border-radius: 99px; animation: loading 1.8s ease-in-out infinite;
+}
+@keyframes loading {
+  0% { left: -50%; width: 30%; }
+  50% { left: 40%; width: 60%; }
+  100% { left: 100%; width: 30%; }
+}
+
+.topbar {
+  max-width: 840px; 
+  margin: 0 auto; 
+  padding: 18px 20px 12px;
+  display: flex; 
+  justify-content: space-between; 
+  align-items: center; 
+  gap: 16px; 
+}
+.brand { display: flex; align-items: center; gap: 12px; }
+.brand h1 { margin: 0; font-size: 1.2rem; font-weight: 800; letter-spacing: -0.4px; }
+.brand p { margin: 1px 0 0; font-size: .78rem; color: var(--muted); font-weight: 600; }
+
+.logo { 
+  font-size: 1.4rem; 
+  display: grid; 
+  place-items: center; 
+  width: 44px; 
+  height: 44px; 
+  border-radius: 14px; 
+  background: var(--surface); 
+  box-shadow: var(--shadow);
+  border: 1px solid var(--line);
+  color: var(--primary);
+  position: relative;
+  cursor: pointer;
+}
+
+main { max-width: 840px; margin: 0 auto; padding: 0 20px; }
+.view { display: grid; gap: 18px; animation: rise .4s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+@keyframes rise { 
+  from { opacity: 0; transform: translateY(14px); } 
+  to { opacity: 1; transform: none; } 
+}
+
+@media (min-width: 800px) { 
+  .grid-2 { grid-template-columns: 1fr 1fr; } 
+}
