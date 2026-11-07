@@ -1,20 +1,171 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="vi">
 <head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#175c47"><title>PocketBudget — Project Starter</title>
-  <link rel="manifest" href="./manifest.webmanifest"><link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>PocketBudget — Quản Lý Chi Tiêu Sinh Viên</title>
+
+  <!-- Google Fonts & Remix Icon -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+  
+  <!-- Tesseract.js AI OCR Quét Hóa Đơn -->
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+
+  <!-- PWA Manifest & Icons -->
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
+  <meta name="theme-color" content="#175c47">
+
+  <!-- Stylesheets -->
+  <link rel="stylesheet" href="./css/layout.css">
+  <link rel="stylesheet" href="./css/components.css">
   <link rel="stylesheet" href="./css/styles.css">
 </head>
 <body>
-  <header><div><span class="eyebrow">NHÓM 3 NGƯỜI · PROJECT STARTER</span><h1>PocketBudget</h1></div><span id="network" class="badge">Đang đọc trạng thái mạng</span></header>
-  <aside class="notice">Đây là bộ khung để nhóm tự triển khai. Giao diện mẫu chưa có thu chi, đồng bộ hoặc chatbot thật.</aside>
-  <nav aria-label="Chức năng">
-    <a href="#dashboard">Tổng quan</a><a href="#transactions">Thu chi & ví</a><a href="#budget">Ngân sách</a><a href="#simulation">Mô phỏng</a><a href="#wishlist">Chờ mua</a><a href="#chat">Chatbot</a>
+
+  <!-- Topbar Header -->
+  <header style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:18px;">
+    <div style="display:flex; align-items:center; gap:12px;">
+      <div style="width:44px; height:44px; border-radius:12px; background:#175c47; color:#fff; display:flex; align-items:center; justify-content:center; font-size:22px;">
+        <i class="ri-wallet-3-line"></i>
+      </div>
+      <div>
+        <span class="eyebrow" style="font-size:11px; font-weight:700; color:#516d62; letter-spacing:0.1em;">NHÓM 3 NGƯỜI · PWA POCKETBUDGET</span>
+        <h1 style="margin:2px 0 0 0; font-size:24px; color:#19352d;">PocketBudget</h1>
+      </div>
+    </div>
+    
+    <div style="display:flex; align-items:center; gap:8px;">
+      <span id="network" class="badge" style="font-size:12px; background:#e3eee7; padding:6px 12px; border-radius:20px;">Đang đọc mạng...</span>
+    </div>
+  </header>
+
+  <!-- Navigation Tabs -->
+  <nav aria-label="Chức năng" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:20px;">
+    <a href="#dashboard" aria-current="page"><i class="ri-dashboard-line"></i> Tổng quan</a>
+    <a href="#transactions"><i class="ri-exchange-dollar-line"></i> Thu chi & ví</a>
+    <a href="#budget"><i class="ri-money-dollar-circle-line"></i> Ngân sách</a>
+    <a href="#simulation"><i class="ri-calculator-line"></i> Mô phỏng</a>
+    <a href="#wishlist"><i class="ri-heart-line"></i> Chờ mua</a>
+    <a href="#chat"><i class="ri-chat-smile-2-line"></i> Chatbot</a>
   </nav>
-  <main id="content" tabindex="-1"></main>
-  <section class="panel"><h2>Kiểm tra bộ khung</h2><p id="sw-status">Đang đăng ký Service Worker…</p><button id="health-button" type="button">Kiểm tra backend</button><p id="health-status" role="status">Chưa kiểm tra. Có mạng không có nghĩa server hoặc AI sẵn sàng.</p></section>
-  <footer>Đọc README.md trước khi bắt đầu. Không nhập dữ liệu tài chính thật vào starter.</footer>
+
+  <!-- Main View Container -->
+  <main id="content" tabindex="-1" style="min-height:350px; margin-bottom:24px;"></main>
+
+  <!-- POPUP CON MÈO NHÀO RA KHI XÀI LỐ -->
+  <div class="cat-alert-overlay" id="catAlertOverlay">
+    <div class="cat-alert-card" id="catAlertCard">
+      <button class="cat-alert-close jelly-btn" id="btnCloseCatAlert"><i class="ri-close-line"></i></button>
+      <div class="cat-speech-bubble-pop">
+        COI MÁ NÀY SÀI TIỀN KÌA TRỜI 😭
+      </div>
+      <div class="cat-img-wrapper">
+        <img src="https://images.unsplash.com/photo-1543852786-1cf6624b9987?w=400" alt="Mèo Meme" class="cat-pop-img">
+      </div>
+    </div>
+  </div>
+
+  <!-- NÚT CAMERA NỔI (Có Vòng Sáng Nhấp Nháy & Hiệu Ứng Jelly) -->
+  <button class="camera-btn jelly-btn glowing-pulse" id="openCamBtn" title="Chụp ảnh / Quét hóa đơn AI">
+    <i class="ri-camera-fill"></i>
+  </button>
+
+  <!-- MODAL CHỤP / QUÉT HÓA ĐƠN AI & THÊM GIAO DỊCH -->
+  <div class="camera-modal" id="cameraModal">
+    <div class="camera-modal-content">
+      <div class="camera-header">
+        <h3 id="modalHeaderTitle"><i class="ri-camera-lens-line"></i> Thêm giao dịch & Quét hóa đơn AI</h3>
+        <button class="close-btn jelly-btn" id="closeCamBtn"><i class="ri-close-line"></i></button>
+      </div>
+
+      <div class="camera-preview-box">
+        <img id="photoPreview" class="photo-preview" style="display: none;" alt="Preview">
+        <div class="camera-placeholder" id="cameraPlaceholder">
+          <i class="ri-image-add-line" style="font-size:36px; color:#888;"></i>
+          <p style="margin:6px 0 0; font-size:13px; color:#666;">Chụp ảnh món ăn / bill từ máy hoặc tải ảnh lên</p>
+        </div>
+        <div class="scan-overlay" id="scanOverlay" style="display: none;">
+          <div class="scan-line"></div>
+          <span>Đang quét hóa đơn bằng AI OCR...</span>
+        </div>
+      </div>
+
+      <div class="camera-actions" style="margin-top:10px; text-align:center;">
+        <input type="file" id="imageInput" accept="image/*" style="display: none;">
+        <button class="btn-secondary jelly-btn" type="button" id="btnChooseImage" style="padding:8px 16px; border-radius:8px; border:1px solid #ccc; background:#f0f0f0; cursor:pointer;">
+          <i class="ri-image-line"></i> Chọn ảnh bill / Chụp ảnh
+        </button>
+      </div>
+
+      <form class="form" id="quickTxForm" style="margin-top: 14px;">
+        <div class="seg" style="display:flex; gap:12px; margin-bottom:10px;">
+          <label><input type="radio" name="quickType" value="expense" checked> <span>Khoản chi (-)</span></label>
+          <label><input type="radio" name="quickType" value="income"> <span>Khoản thu (+)</span></label>
+        </div>
+
+        <div class="field" style="margin-bottom:10px;">
+          <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">
+            Số tiền (VNĐ) <small style="color: #175c47;" id="scanBadge"></small>
+          </label>
+          <input type="number" id="quickAmount" placeholder="Nhập số tiền (vd: 45000)" required min="1000" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:6px;">
+        </div>
+
+        <div class="field" style="margin-bottom:10px;">
+          <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Ví thanh toán</label>
+          <select id="quickWallet" class="select-field" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:6px; background:#fff;"></select>
+        </div>
+
+        <div class="field" style="margin-bottom:10px;">
+          <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Ghi chú / Món ăn / Bill</label>
+          <input type="text" id="quickNote" placeholder="Ví dụ: Cơm trưa, Bún đậu, Sách..." required style="width:100%; padding:8px; border:1px solid #ccc; border-radius:6px;">
+        </div>
+
+        <div class="field" style="margin-bottom:12px;">
+          <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Danh mục</label>
+          <select id="quickCategory" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:6px; background:#fff;">
+            <option value="food">🍜 Ăn uống</option>
+            <option value="study">📚 Học tập</option>
+            <option value="transport">🛵 Đi lại / Xe cộ</option>
+            <option value="shopping">🛍️ Mua sắm</option>
+            <option value="entertainment">🎮 Giải trí</option>
+            <option value="other_expense">🏠 Chi khác</option>
+          </select>
+        </div>
+
+        <div style="display: flex; gap: 10px;">
+          <button type="button" class="btn-secondary jelly-btn" id="btnCancelQuick" style="flex:1; padding:10px; border:1px solid #ccc; border-radius:8px; background:#fff;">Hủy</button>
+          <button type="submit" class="primary jelly-btn" style="flex:2; padding:10px; border:none; border-radius:8px; background:#175c47; color:#fff; font-weight:700;">
+            <i class="ri-check-line"></i> Xác Nhận Lưu
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast Thông báo -->
+  <div class="toast" id="toast">Đã lưu giao dịch vào máy!</div>
+
+  <!-- Layer hiệu ứng mưa xu & tiền bay -->
+  <div class="fx-layer" id="fxLayer"></div>
+
+  <!-- Khung kiểm tra Backend & Service Worker -->
+  <section class="panel" style="margin-top:20px; padding:18px; border:1px solid #d8e3dc; border-radius:12px; background:#fff;">
+    <h3 style="margin-top:0;">Trạng thái hệ thống</h3>
+    <p id="sw-status" style="font-size:13px; color:#555;">Đang đăng ký Service Worker…</p>
+    <div style="display:flex; gap:10px; align-items:center;">
+      <button id="health-button" type="button" style="background:#516d62; color:#fff; border:none; padding:8px 14px; border-radius:6px; cursor:pointer;">Kiểm tra backend</button>
+      <span id="health-status" role="status" style="font-size:13px; color:#444;"></span>
+    </div>
+  </section>
+
+  <footer style="margin-top:24px; text-align:center; font-size:12px; color:#777;">
+    PocketBudget — Dự án PWA Môn Lập Trình Web (Thành viên A + B + C).
+  </footer>
+
   <script type="module" src="./js/app.js"></script>
 </body>
 </html>

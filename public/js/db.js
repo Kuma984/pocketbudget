@@ -113,3 +113,75 @@ export async function saveAndQueue({ user_id, entity, action, record, base_versi
     tx.onabort = () => reject(tx.error || new Error('Giao dịch IndexedDB bị hủy.'));
   });
 }
+
+/**
+ * Đọc tất cả các thao tác đang chờ trong outbox của một user
+ */
+export async function getOutboxOperations(userId) {
+  const db = await openDatabase();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(['outbox'], 'readonly');
+    const store = tx.objectStore('outbox');
+    const index = store.index('user_id');
+    const req = index.getAll(IDBKeyRange.only(String(userId)));
+    req.onsuccess = () => resolve(req.result || []);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+/**
+ * Xóa các thao tác đã được máy chủ xác nhận (ACK) khỏi outbox
+ */
+export async function clearOutboxOperations(userId, opIds) {
+  if (!opIds || opIds.length === 0) return;
+  const db = await openDatabase();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(['outbox'], 'readwrite');
+    const store = tx.objectStore('outbox');
+    opIds.forEach(id => store.delete(id));
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+/**
+ * Trộn dữ liệu snapshot từ server về IndexedDB mà không đè lên các bản ghi đang pending sửa
+ */
+export async function mergeSnapshotData(userId, snapshot) {
+  const db = await openDatabase();
+  const stores = ['wallets', 'transactions', 'budgets', 'wishlist'];
+  
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction([...stores, 'outbox'], 'readwrite');
+    const outboxStore = tx.objectStore('outbox');
+    const outboxReq = outboxStore.index('user_id').getAll(IDBKeyRange.only(String(userId)));
+
+    outboxReq.onsuccess = () => {
+      const pendingOps = outboxReq.result || [];
+      const pendingEntityIds = new Set(pendingOps.map(op => op.entity_id));
+
+      for (const entityKey of ['wallets', 'transactions', 'budgets', 'wishlist']) {
+        const storeName = getStoreNameForEntity(entityKey);
+        const store = tx.objectStore(storeName);
+        const items = snapshot[entityKey] || [];
+
+        for (const item of items) {
+          // Nếu item đang có thay đổi chờ đồng bộ ở outbox, giữ lại bản local
+          if (pendingEntityIds.has(item.id)) {
+            continue;
+          }
+
+          const localRecord = {
+            ...item,
+            user_id: String(userId),
+            sync_status: 'synced',
+          };
+          store.put(localRecord);
+        }
+      }
+    };
+
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
