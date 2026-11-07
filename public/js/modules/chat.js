@@ -1,16 +1,17 @@
 // Owner C — C04 / C05 / C06. This is a placeholder screen, not a completed feature.
 export function render(container) {
-  container.replaceChildren();
-  const heading = document.createElement('h2');
-  heading.textContent = "Chatbot local";
-  const owner = document.createElement('p');
-  owner.className = 'owner';
-  owner.textContent = "TODO · Thành viên C · C04 / C05 / C06";
-  const list = document.createElement('ul');
-  for (const text of ["Chat gọi PHP API, PHP gọi Ollama; chưa có kết nối trong starter.", "Model tạo intent hoặc draft có kiểm tra, không tự ghi tiền.", "Nếu AI không sẵn sàng, nhập liệu và mô phỏng thủ công vẫn dùng."]) {
-    const item = document.createElement('li');
-    item.textContent = text;
-    list.append(item);
-  }
-  container.append(heading, owner, list);
+  container.innerHTML = `
+    <section class="card">
+      <h2><i class="ri-chat-smile-2-line"></i> Trợ lý Tài chính AI (Ollama Local) (C04 / C05 / C06)</h2>
+      <p class="section-desc">Tư vấn ngân sách và trích xuất ý định chi tiêu thông minh bằng mô hình ngôn ngữ chạy cục bộ.</p>
+      <div style="background:var(--bg); border:1px solid var(--line-strong); padding:16px; border-radius:var(--radius-sm);">
+        <p style="margin:0 0 10px; font-weight:700; color:var(--muted);">TODO · Nhiệm vụ Thành viên C · C04 / C05 / C06:</p>
+        <ul style="margin:0; padding-left:20px; color:var(--text);">
+          <li style="margin-bottom:6px;">Chat gọi PHP API (<code>api/chat.php</code>), PHP gọi Ollama LLM nội bộ.</li>
+          <li style="margin-bottom:6px;">Model tạo intent hoặc draft có xác nhận của người dùng, không tự động âm thầm ghi tiền.</li>
+          <li>Khi AI chưa khởi động, toàn bộ tính năng nhập liệu thủ công và PWA vẫn hoạt động bình thường.</li>
+        </ul>
+      </div>
+    </section>
+  `;
 }

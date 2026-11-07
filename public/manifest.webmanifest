@@ -1,13 +1,13 @@
 {
   "id": "./",
-  "name": "PocketBudget — Student Finance",
+  "name": "PocketBudget — Cute Cat Meme Edition",
   "short_name": "PocketBudget",
   "lang": "vi",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#f5f8f6",
-  "theme_color": "#175c47",
+  "background_color": "#f8fafc",
+  "theme_color": "#10b981",
   "icons": [
     {
       "src": "./icons/icon-192.png",

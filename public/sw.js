@@ -1,6 +1,6 @@
 // Cache the shell only. API writes/reads belong to app sync, never fake JSON from HTML.
 const PREFIX = `pocketbudget-shell:${self.registration.scope}:`;
-const CACHE = `${PREFIX}v2`;
+const CACHE = `${PREFIX}v3`;
 const ASSETS = [
   "./",
   "./index.html",
@@ -22,6 +22,7 @@ const ASSETS = [
   "./js/modules/simulation.js",
   "./js/modules/wishlist.js",
   "./js/modules/chat.js",
+  "./js/modules/system.js",
   "./js/domain/finance.js"
 ];
 const ASSET_URLS = new Set(ASSETS.map(path => new URL(path, self.registration.scope).href));

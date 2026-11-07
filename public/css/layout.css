@@ -1,5 +1,5 @@
 /* =========================================================
-   LAYOUT.CSS - CUTE BUDGET LAYOUT WITH ADVANCED ANIMATIONS
+   LAYOUT.CSS - CUTE BUDGET LAYOUT (NETLIFY MATCHED)
    ========================================================= */
 
 :root {
@@ -41,62 +41,6 @@ body {
     radial-gradient(circle at 10% 20%, rgba(16, 185, 129, 0.06) 0%, transparent 45%);
   background-attachment: fixed;
   padding-bottom: 100px;
-  overflow-x: hidden;
-}
-
-.fx-layer {
-  position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-  pointer-events: none; z-index: 999999; overflow: hidden;
-}
-
-.splash-screen {
-  position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-  display: flex; align-items: center; justify-content: center;
-  z-index: 100000; overflow: hidden; opacity: 1; transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1);
-}
-.splash-screen.fade-out {
-  opacity: 0; pointer-events: none;
-}
-.falling-container {
-  position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;
-}
-.falling-item {
-  position: absolute; top: -60px; font-size: 2.2rem;
-  animation: fallDown linear infinite; opacity: 0.85; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3));
-}
-@keyframes fallDown {
-  0% { transform: translateY(0) rotate(0deg); opacity: 0; }
-  10% { opacity: 1; }
-  90% { opacity: 1; }
-  100% { transform: translateY(105vh) rotate(360deg); opacity: 0; }
-}
-.splash-card {
-  text-align: center; color: #fff; z-index: 2; padding: 32px;
-  background: rgba(255, 255, 255, 0.07); backdrop-filter: blur(16px);
-  border-radius: var(--radius-lg); border: 1px solid rgba(255, 255, 255, 0.15);
-  box-shadow: 0 20px 40px rgba(0,0,0,0.4); animation: popUp 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
-}
-@keyframes popUp {
-  0% { transform: scale(0.7); opacity: 0; }
-  100% { transform: scale(1); opacity: 1; }
-}
-.splash-logo { font-size: 4rem; margin-bottom: 8px; filter: drop-shadow(0 6px 16px rgba(16,185,129,0.5)); }
-.splash-title { margin: 0; font-size: 1.8rem; font-weight: 800; letter-spacing: -0.5px; }
-.splash-sub { margin: 6px 0 20px; font-size: 0.88rem; color: #94a3b8; font-weight: 600; }
-.splash-loader {
-  width: 140px; height: 5px; background: rgba(255,255,255,0.15); border-radius: 99px;
-  margin: 0 auto; overflow: hidden; position: relative;
-}
-.splash-loader::after {
-  content: ''; position: absolute; top: 0; left: -50%; width: 50%; height: 100%;
-  background: linear-gradient(90deg, var(--primary), var(--primary-2));
-  border-radius: 99px; animation: loading 1.8s ease-in-out infinite;
-}
-@keyframes loading {
-  0% { left: -50%; width: 30%; }
-  50% { left: 40%; width: 60%; }
-  100% { left: 100%; width: 30%; }
 }
 
 .topbar {
@@ -107,11 +51,11 @@ body {
   justify-content: space-between; 
   align-items: center; 
   gap: 16px; 
+  flex-wrap: wrap;
 }
 .brand { display: flex; align-items: center; gap: 12px; }
-.brand h1 { margin: 0; font-size: 1.2rem; font-weight: 800; letter-spacing: -0.4px; }
-.brand p { margin: 1px 0 0; font-size: .78rem; color: var(--muted); font-weight: 600; }
-
+.brand h1 { margin: 0; font-size: 1.25rem; font-weight: 800; letter-spacing: -0.4px; }
+.brand p { margin: 1px 0 0; font-size: .8rem; color: var(--muted); font-weight: 600; }
 .logo { 
   font-size: 1.4rem; 
   display: grid; 
@@ -123,8 +67,54 @@ body {
   box-shadow: var(--shadow);
   border: 1px solid var(--line);
   color: var(--primary);
-  position: relative;
-  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.topbar .pills {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Thanh điều hướng dạng Pill mượt mà */
+.app-nav {
+  max-width: 840px;
+  margin: 0 auto 18px auto;
+  padding: 0 20px;
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.app-nav::-webkit-scrollbar { display: none; }
+.nav-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 99px;
+  font-size: 0.84rem;
+  font-weight: 700;
+  text-decoration: none;
+  color: var(--muted);
+  background: var(--surface);
+  border: 1.5px solid var(--line-strong);
+  white-space: nowrap;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.02);
+}
+.nav-pill:hover {
+  color: var(--primary);
+  border-color: var(--primary);
+  transform: translateY(-1px);
+}
+.nav-pill[aria-current="page"] {
+  background: var(--text);
+  color: #ffffff;
+  border-color: var(--text);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.15);
 }
 
 main { max-width: 840px; margin: 0 auto; padding: 0 20px; }
@@ -137,4 +127,20 @@ main { max-width: 840px; margin: 0 auto; padding: 0 20px; }
 
 @media (min-width: 800px) { 
   .grid-2 { grid-template-columns: 1fr 1fr; } 
+}
+
+/* Layer Mưa Xu Rơi */
+.fx-layer {
+  position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+  pointer-events: none; z-index: 999999; overflow: hidden;
+}
+.falling-item {
+  position: absolute; top: -50px; font-size: 2rem;
+  animation: fallDown linear forwards; opacity: 0.9; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.2));
+}
+@keyframes fallDown {
+  0% { transform: translateY(0) rotate(0deg); opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { transform: translateY(105vh) rotate(360deg); opacity: 0; }
 }

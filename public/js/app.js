@@ -1,288 +1,496 @@
-// Điểm điều phối ứng dụng PWA (Ghép nối Thành viên A + B)
+// App.js - Điểm điều phối ứng dụng PocketBudget (Cute Cat Meme Edition)
+// Tích hợp toàn diện Thành viên A (Core & Backend), Thành viên B (PWA & Dashboard), Thành viên C (Simulation & AI)
 import { render as dashboard } from './modules/dashboard.js';
 import { render as transactions } from './modules/transactions.js';
 import { render as budget } from './modules/budget.js';
 import { render as simulation } from './modules/simulation.js';
 import { render as wishlist } from './modules/wishlist.js';
 import { render as chat } from './modules/chat.js';
+import { render as system } from './modules/system.js';
+
 import { apiRequest } from './api.js';
-import { listRecords, saveAndQueue, generateClientUuid } from './db.js';
+import { listRecords, saveAndQueue, generateClientUuid, openDatabase } from './db.js';
+import { syncNow } from './sync.js';
 
 let currentImageData = null;
 let catTimer = null;
+let currentUser = null;
+let csrfToken = null;
 
-const routes = { dashboard, transactions, budget, simulation, wishlist, chat };
+const routes = { dashboard, transactions, budget, simulation, wishlist, chat, system };
 
-// 1. Quản lý Điều hướng (Router)
-function route() {
-  const raw = location.hash.slice(1) || 'dashboard';
-  const name = Object.hasOwn(routes, raw) ? raw : 'dashboard';
-  
-  routes[name](document.querySelector('#content'));
-  
-  document.querySelectorAll('nav a').forEach(a => {
-    if (a.hash === `#${name}`) a.setAttribute('aria-current', 'page');
-    else a.removeAttribute('aria-current');
-  });
-}
+// ==========================================
+// 1. KHỞI CHẠY KHI TẢI TRANG
+// ==========================================
+document.addEventListener('DOMContentLoaded', async () => {
+  await fetchCurrentUser();
+  checkOnboarding();
+  updateTopBarInfo();
+  setupEventListeners();
+  setupCameraAndOCR();
+  registerServiceWorker();
+  route();
+});
 
-// 2. Theo dõi trạng thái mạng
-function networkHint() {
-  const netBadge = document.querySelector('#network');
-  if (navigator.onLine) {
-    netBadge.textContent = 'Mạng: Trực tuyến (Online)';
-    netBadge.style.background = '#d4edda';
-    netBadge.style.color = '#155724';
-  } else {
-    netBadge.textContent = 'Mạng: Ngoại tuyến (Offline)';
-    netBadge.style.background = '#f8d7da';
-    netBadge.style.color = '#721c24';
+// Lấy thông tin user phiên làm việc nếu có
+async function fetchCurrentUser() {
+  try {
+    const res = await apiRequest('auth.php?action=me');
+    currentUser = res.user;
+    csrfToken = res.csrf_token;
+  } catch {
+    currentUser = null;
+    csrfToken = null;
   }
 }
 
-window.addEventListener('hashchange', route);
-window.addEventListener('online', networkHint);
-window.addEventListener('offline', networkHint);
+// ==========================================
+// 2. ONBOARDING & TOPBAR
+// ==========================================
+function checkOnboarding() {
+  const localName = localStorage.getItem('student_name');
+  const modal = document.getElementById('onboardModal');
 
-// Khởi chạy ban đầu
-route();
-networkHint();
+  if (currentUser && currentUser.name) {
+    if (!localName) localStorage.setItem('student_name', currentUser.name);
+    modal.style.display = 'none';
+    document.getElementById('userHeaderName').textContent = `Chào ${currentUser.name} 👋`;
+    return;
+  }
 
-// 3. Đăng ký Service Worker
-const swStatus = document.querySelector('#sw-status');
-if ('serviceWorker' in navigator && window.isSecureContext) {
-  navigator.serviceWorker.register('./sw.js')
-    .then(() => {
-      swStatus.textContent = 'Service Worker đã kích hoạt. Ứng dụng đã sẵn sàng chạy Offline!';
-    })
-    .catch(error => {
-      swStatus.textContent = `Không đăng ký được Service Worker: ${error.message}`;
-    });
-} else {
-  swStatus.textContent = 'Service Worker cần chạy trên HTTPS hoặc localhost.';
+  if (!localName || localName.trim() === '') {
+    modal.style.display = 'flex';
+  } else {
+    modal.style.display = 'none';
+    document.getElementById('userHeaderName').textContent = `Chào ${localName} 👋`;
+  }
 }
 
-// 4. Kiểm tra Backend Health
-const healthBtn = document.querySelector('#health-button');
-if (healthBtn) {
-  healthBtn.addEventListener('click', async () => {
-    const status = document.querySelector('#health-status');
-    healthBtn.disabled = true;
-    status.textContent = 'Đang kiểm tra backend...';
-    try {
-      const res = await apiRequest('health.php');
-      status.innerHTML = `Backend: <strong style="color:green;">${res.status}</strong> (DB: ${res.database_connected ? 'Đã kết nối' : 'Chưa kết nối'})`;
-    } catch (err) {
-      status.innerHTML = `<span style="color:red;">Lỗi kết nối server: ${err.message}</span>`;
-    } finally {
-      healthBtn.disabled = false;
+function saveUserName() {
+  const nameInput = document.getElementById('userNameInput');
+  const name = nameInput.value.trim();
+  if (name !== '') {
+    localStorage.setItem('student_name', name);
+    document.getElementById('userHeaderName').textContent = `Chào ${name} 👋`;
+    document.getElementById('onboardModal').style.display = 'none';
+    showToast(`Chào mừng ${name} đến với PocketBudget! ✨`);
+  } else {
+    alert('Vui lòng nhập tên của bạn nhé!');
+  }
+}
+
+async function updateTopBarInfo() {
+  // Cập nhật streak
+  const streak = localStorage.getItem('pb_streak_count') || '1';
+  const streakEl = document.getElementById('streakCount');
+  if (streakEl) streakEl.textContent = streak;
+
+  // Cập nhật trạng thái chi tiêu hôm nay
+  const userId = currentUser ? currentUser.id : '1';
+  try {
+    const txs = await listRecords('transactions', userId);
+    const todayStr = new Date().toISOString().split('T')[0];
+    let todayExp = 0;
+    txs.forEach(t => {
+      const isExpense = t.type === 'expense';
+      const d = t.occurred_on || (t.date ? t.date.split('T')[0] : '');
+      if (isExpense && d === todayStr) {
+        todayExp += Number(t.amount_vnd || t.amount || 0);
+      }
+    });
+
+    const todayStatusEl = document.getElementById('todayExpenseStatus');
+    if (todayStatusEl) {
+      if (todayExp > 0) {
+        todayStatusEl.textContent = `Đã chi ${new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(todayExp)}`;
+        todayStatusEl.style.color = 'var(--danger)';
+      } else {
+        todayStatusEl.textContent = 'Chưa chi tiêu';
+        todayStatusEl.style.color = 'var(--primary)';
+      }
     }
+  } catch (e) {
+    // offline or loading
+  }
+}
+
+// ==========================================
+// 3. ĐIỀU HƯỚNG (ROUTER)
+// ==========================================
+function route() {
+  const raw = location.hash.slice(1) || 'dashboard';
+  const name = Object.hasOwn(routes, raw) ? raw : 'dashboard';
+
+  const container = document.getElementById('content');
+  if (container) {
+    container.innerHTML = '';
+    routes[name](container);
+  }
+
+  document.querySelectorAll('nav.app-nav a').forEach(a => {
+    if (a.getAttribute('href') === `#${name}`) {
+      a.setAttribute('aria-current', 'page');
+    } else {
+      a.removeAttribute('aria-current');
+    }
+  });
+
+  updateTopBarInfo();
+}
+
+window.addEventListener('hashchange', route);
+
+// Theo dõi mạng
+function updateNetworkStatus() {
+  const netEl = document.getElementById('network');
+  if (!netEl) return;
+  if (navigator.onLine) {
+    netEl.setAttribute('data-state', 'online');
+    netEl.innerHTML = '<i class="ri-wifi-line"></i> Online';
+  } else {
+    netEl.setAttribute('data-state', 'offline');
+    netEl.innerHTML = '<i class="ri-wifi-off-line"></i> Offline';
+    netEl.style.background = 'var(--danger-light)';
+    netEl.style.color = 'var(--danger)';
+  }
+}
+window.addEventListener('online', updateNetworkStatus);
+window.addEventListener('offline', updateNetworkStatus);
+updateNetworkStatus();
+
+// ==========================================
+// 4. POPUP CON MÈO NHÀO RA KHI XÀI LỐ
+// ==========================================
+export function triggerCatAlertPopup() {
+  const popup = document.getElementById('catAlertOverlay');
+  if (!popup) return;
+  popup.classList.add('show');
+
+  if (catTimer) clearTimeout(catTimer);
+  catTimer = setTimeout(() => {
+    closeCatAlert();
+  }, 5000); // 5 giây tự ẩn
+}
+
+export function closeCatAlert() {
+  const popup = document.getElementById('catAlertOverlay');
+  if (popup) popup.classList.remove('show');
+  if (catTimer) clearTimeout(catTimer);
+}
+
+// ==========================================
+// 5. MODAL ĐẶT NGÂN SÁCH THÁNG
+// ==========================================
+function openBudgetModal() {
+  const current = Number(localStorage.getItem('user_monthly_budget')) || 3000000;
+  const input = document.getElementById('monthlyBudgetInput');
+  if (input) input.value = current;
+  const modal = document.getElementById('budgetModal');
+  if (modal) modal.classList.add('show');
+}
+
+function closeBudgetModal() {
+  const modal = document.getElementById('budgetModal');
+  if (modal) modal.classList.remove('show');
+}
+
+function saveMonthlyBudget() {
+  const input = document.getElementById('monthlyBudgetInput');
+  const val = Number(input.value);
+  if (val && val > 0) {
+    localStorage.setItem('user_monthly_budget', val);
+    closeBudgetModal();
+    showToast('Đã cập nhật ngân sách tháng thành công!');
+    route();
+  } else {
+    alert('Vui lòng nhập số tiền ngân sách hợp lệ (> 0 VNĐ)');
+  }
+}
+
+// ==========================================
+// 6. CAMERA NỔI & AI OCR QUÉT HÓA ĐƠN
+// ==========================================
+async function populateWalletDropdown() {
+  const select = document.getElementById('photoWallet');
+  if (!select) return;
+  select.innerHTML = '';
+
+  const userId = currentUser ? currentUser.id : '1';
+  let wallets = await listRecords('wallets', userId);
+
+  if (wallets.length === 0) {
+    wallets = [
+      { id: 'wallet_cash', name: 'Ví tiền mặt' },
+      { id: 'wallet_bank', name: 'Ngân hàng' },
+      { id: 'wallet_momo', name: 'MoMo' }
+    ];
+  }
+
+  wallets.forEach(w => {
+    const opt = document.createElement('option');
+    opt.value = w.id;
+    opt.textContent = w.name;
+    opt.setAttribute('data-name', w.name);
+    select.appendChild(opt);
   });
 }
 
-// 5. Setup Camera Nổi & AI OCR Tesseract Quét Hóa Đơn (Thành viên B)
-setupCameraAndOCR();
-
-async function setupCameraAndOCR() {
+function setupCameraAndOCR() {
   const openCamBtn = document.getElementById('openCamBtn');
   const closeCamBtn = document.getElementById('closeCamBtn');
-  const btnCancelQuick = document.getElementById('btnCancelQuick');
+  const btnCancelCam = document.getElementById('btnCancelCam');
   const cameraModal = document.getElementById('cameraModal');
-  const imageInput = document.getElementById('imageInput');
   const btnChooseImage = document.getElementById('btnChooseImage');
-  const quickForm = document.getElementById('quickTxForm');
-  const quickWallet = document.getElementById('quickWallet');
+  const imageInput = document.getElementById('imageInput');
   const photoPreview = document.getElementById('photoPreview');
   const cameraPlaceholder = document.getElementById('cameraPlaceholder');
   const scanOverlay = document.getElementById('scanOverlay');
   const scanBadge = document.getElementById('scanBadge');
+  const photoTxForm = document.getElementById('photoTxForm');
 
-  // Lấy danh sách ví vào dropdown của modal
-  async function populateWallets() {
-    let currentUser = null;
-    try {
-      const res = await apiRequest('auth.php?action=me');
-      currentUser = res.user;
-    } catch { currentUser = null; }
-    const userId = currentUser ? currentUser.id : '1';
-
-    const wallets = await listRecords('wallets', userId);
-    quickWallet.innerHTML = '';
-    if (wallets.length === 0) {
-      quickWallet.innerHTML = '<option value="">-- Chưa có ví (Tạo ví trước) --</option>';
-    } else {
-      wallets.forEach(w => {
-        quickWallet.innerHTML += `<option value="${w.id}">${w.name}</option>`;
-      });
-    }
-    return userId;
+  if (openCamBtn) {
+    openCamBtn.onclick = async () => {
+      await populateWalletDropdown();
+      const today = new Date();
+      const dateStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+      document.getElementById('selectedDateInput').value = dateStr;
+      document.getElementById('modalHeaderTitle').innerHTML = `<i class="ri-camera-lens-line"></i> Thêm giao dịch & Khoảnh khắc hôm nay`;
+      cameraModal.classList.add('show');
+    };
   }
 
-  openCamBtn.onclick = async () => {
-    await populateWallets();
-    cameraModal.classList.add('show');
-  };
-
-  function closeModal() {
+  function closeCameraModal() {
     cameraModal.classList.remove('show');
-    quickForm.reset();
+    photoTxForm.reset();
     photoPreview.style.display = 'none';
     cameraPlaceholder.style.display = 'block';
     scanBadge.textContent = '';
     currentImageData = null;
   }
 
-  closeCamBtn.onclick = closeModal;
-  btnCancelQuick.onclick = closeModal;
+  if (closeCamBtn) closeCamBtn.onclick = closeCameraModal;
+  if (btnCancelCam) btnCancelCam.onclick = closeCameraModal;
 
-  btnChooseImage.onclick = () => {
-    imageInput.click();
-  };
+  if (btnChooseImage && imageInput) {
+    btnChooseImage.onclick = () => imageInput.click();
+    imageInput.onchange = (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
 
-  // Xử lý chọn ảnh & Quét AI OCR Tesseract
-  imageInput.onchange = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        currentImageData = evt.target.result;
+        photoPreview.src = currentImageData;
+        photoPreview.style.display = 'block';
+        cameraPlaceholder.style.display = 'none';
 
-    const reader = new FileReader();
-    reader.onload = function(evt) {
-      currentImageData = evt.target.result;
-      photoPreview.src = currentImageData;
-      photoPreview.style.display = 'block';
-      cameraPlaceholder.style.display = 'none';
+        scanOverlay.style.display = 'flex';
+        scanBadge.textContent = '(Đang quét hóa đơn AI...)';
 
-      scanOverlay.style.display = 'flex';
-      scanBadge.textContent = '(Đang quét Hóa Đơn AI...)';
+        if (typeof Tesseract !== 'undefined') {
+          Tesseract.recognize(currentImageData, 'eng+vie')
+            .then(({ data: { text } }) => {
+              scanOverlay.style.display = 'none';
+              const numbers = text.match(/\b\d{1,3}(?:[.,]\d{3})*(?:\s*đ|\s*VND)?\b/gi);
+              let detected = 0;
 
-      if (typeof Tesseract !== 'undefined') {
-        Tesseract.recognize(currentImageData, 'eng+vie')
-          .then(({ data: { text } }) => {
-            scanOverlay.style.display = 'none';
-            // Regex tìm số tiền trên hóa đơn (vd: 45.000, 120,000, 35000)
-            const numbers = text.match(/\b\d{1,3}(?:[.,]\d{3})*(?:\s*đ|\s*VND)?\b/gi);
-            let detected = 0;
+              if (numbers) {
+                numbers.forEach(numStr => {
+                  const cleanNum = parseInt(numStr.replace(/[^0-9]/g, ''), 10);
+                  if (cleanNum >= 1000 && cleanNum > detected && cleanNum < 500000000) {
+                    detected = cleanNum;
+                  }
+                });
+              }
 
-            if (numbers) {
-              numbers.forEach(n => {
-                const clean = parseInt(n.replace(/[^0-9]/g, ''), 10);
-                if (clean >= 1000 && clean > detected && clean < 500000000) {
-                  detected = clean;
-                }
-              });
-            }
+              if (detected > 0) {
+                document.getElementById('photoAmount').value = detected;
+                scanBadge.textContent = '✨ Nhận diện được: ' + new Intl.NumberFormat('vi-VN').format(detected) + ' đ';
+              } else {
+                scanBadge.textContent = '(Chưa nhận diện được giá bill, hãy nhập tay)';
+              }
+            })
+            .catch(() => {
+              scanOverlay.style.display = 'none';
+              scanBadge.textContent = '(Nhập tay số tiền)';
+            });
+        } else {
+          scanOverlay.style.display = 'none';
+          scanBadge.textContent = '(Ảnh đã được đính kèm)';
+        }
+      };
+      reader.readAsDataURL(file);
+    };
+  }
 
-            if (detected > 0) {
-              document.getElementById('quickAmount').value = detected;
-              scanBadge.textContent = `✨ Nhận diện được: ${detected.toLocaleString('vi-VN')} đ`;
-            } else {
-              scanBadge.textContent = '(Chưa nhận diện được giá, hãy nhập tay)';
-            }
-          })
-          .catch(() => {
-            scanOverlay.style.display = 'none';
-            scanBadge.textContent = '(Vui lòng nhập tay số tiền)';
-          });
+  if (photoTxForm) {
+    photoTxForm.onsubmit = async (e) => {
+      e.preventDefault();
+
+      const amount = Number(document.getElementById('photoAmount').value);
+      const title = document.getElementById('photoTitle').value.trim();
+      const type = photoTxForm.elements['photoType'].value;
+      const categoryName = photoTxForm.elements['photoCat'].value;
+      const walletSelect = document.getElementById('photoWallet');
+      const walletId = walletSelect.value;
+      const walletName = walletSelect.selectedOptions[0]?.textContent || 'Ví tiền mặt';
+      const customDate = document.getElementById('selectedDateInput').value;
+
+      const dateStr = customDate || new Date().toISOString().split('T')[0];
+      const isoDate = new Date(dateStr + 'T12:00:00').toISOString();
+
+      const userId = currentUser ? currentUser.id : '1';
+
+      // Mã hóa category theo danh mục Member A
+      const catMap = {
+        'Ăn uống': 'food',
+        'Học tập': 'study',
+        'Xe cộ': 'transport',
+        'Nhà ở': 'housing',
+        'Giải trí': 'entertainment',
+        'Thu nhập': 'salary'
+      };
+      const categoryCode = catMap[categoryName] || 'food';
+
+      // Tạo transaction record tương thích song song cả Thành viên A & Thành viên B
+      const txRecord = {
+        id: generateClientUuid(),
+        user_id: String(userId),
+        wallet_id: walletId,
+        wallet: walletName,
+        destination_wallet_id: null,
+        type: type,
+        amount_vnd: amount,
+        amount: amount,
+        category_code: categoryCode,
+        category: categoryName,
+        occurred_on: dateStr,
+        date: isoDate,
+        note: title,
+        title: title,
+        image: currentImageData,
+        version: 1,
+        updated_at: new Date().toISOString()
+      };
+
+      await saveAndQueue({
+        user_id: String(userId),
+        entity: 'transaction',
+        action: 'upsert',
+        record: txRecord
+      });
+
+      closeCameraModal();
+      showToast('Đã lưu khoảnh khắc & chi tiêu!');
+
+      // Hiệu ứng tương tác:
+      if (type === 'income') {
+        triggerRainCoinsEffect();
       } else {
-        scanOverlay.style.display = 'none';
-        scanBadge.textContent = '(Đã tải ảnh lên)';
+        // Khi chi tiêu >= 100k -> Bật popup con mèo
+        if (amount >= 100000) {
+          triggerCatAlertPopup();
+        }
       }
+
+      route();
     };
-    reader.readAsDataURL(file);
-  };
-
-  // Submit lưu giao dịch nhanh
-  quickForm.onsubmit = async (e) => {
-    e.preventDefault();
-    const userId = await populateWallets();
-
-    const amount = parseInt(document.getElementById('quickAmount').value, 10);
-    const note = document.getElementById('quickNote').value.trim();
-    const type = quickForm.elements['quickType'].value;
-    const category = document.getElementById('quickCategory').value;
-    const walletId = quickWallet.value;
-
-    if (!walletId) {
-      alert('Vui lòng tạo ít nhất 1 ví trong tab "Thu chi & ví" trước.');
-      return;
-    }
-
-    const txRecord = {
-      id: generateClientUuid(),
-      wallet_id: walletId,
-      destination_wallet_id: null,
-      type,
-      amount_vnd: amount,
-      category_code: category,
-      occurred_on: new Date().toISOString().split('T')[0],
-      note,
-      image: currentImageData, // Lưu ảnh hóa đơn
-      version: 1
-    };
-
-    await saveAndQueue({
-      user_id: userId,
-      entity: 'transaction',
-      action: 'upsert',
-      record: txRecord
-    });
-
-    closeModal();
-    showToast('Đã lưu giao dịch vào IndexedDB!');
-
-    // Hiệu ứng tương tác sinh động
-    if (type === 'income') {
-      triggerRainCoinsEffect();
-    } else {
-      if (amount >= 200000) {
-        triggerCatAlert();
-      }
-    }
-
-    // Refresh view hiện tại
-    route();
-  };
+  }
 }
 
-// 6. Hiệu ứng Mèo Meme & Mưa Xu
-function triggerCatAlert() {
-  const overlay = document.getElementById('catAlertOverlay');
-  overlay.classList.add('show');
-  if (catTimer) clearTimeout(catTimer);
-  catTimer = setTimeout(() => {
-    overlay.classList.remove('show');
-  }, 4500);
+// ==========================================
+// 7. SETUP EVENT LISTENERS
+// ==========================================
+function setupEventListeners() {
+  const btnSaveName = document.getElementById('btnSaveName');
+  if (btnSaveName) btnSaveName.onclick = saveUserName;
+
+  const nameInput = document.getElementById('userNameInput');
+  if (nameInput) {
+    nameInput.onkeypress = (e) => {
+      if (e.key === 'Enter') saveUserName();
+    };
+  }
+
+  const btnCloseCat = document.getElementById('btnCloseCatAlert');
+  if (btnCloseCat) btnCloseCat.onclick = closeCatAlert;
+
+  const btnOpenBudget = document.getElementById('btnOpenBudgetModal');
+  if (btnOpenBudget) btnOpenBudget.onclick = openBudgetModal;
+
+  const btnCloseBudget = document.getElementById('closeBudgetBtn');
+  if (btnCloseBudget) btnCloseBudget.onclick = closeBudgetModal;
+
+  const btnSaveBud = document.getElementById('btnSaveBudget');
+  if (btnSaveBud) btnSaveBud.onclick = saveMonthlyBudget;
+
+  const btnCloseDayDetail = document.getElementById('closeDayDetailBtn');
+  if (btnCloseDayDetail) {
+    btnCloseDayDetail.onclick = () => {
+      document.getElementById('dayDetailModal').classList.remove('show');
+    };
+  }
+
+  // Nút Đồng bộ trên Topbar
+  const btnSyncHeader = document.getElementById('btnSyncHeader');
+  const syncStatusHeader = document.getElementById('syncStatusHeader');
+  if (btnSyncHeader) {
+    btnSyncHeader.onclick = async () => {
+      btnSyncHeader.disabled = true;
+      if (syncStatusHeader) syncStatusHeader.textContent = 'Đang đồng bộ...';
+      try {
+        const userId = currentUser ? currentUser.id : '1';
+        const res = await syncNow(userId, csrfToken);
+        showToast(`Đã đồng bộ máy chủ! Đẩy: ${res.pushed || 0}, Nhận: ${res.pulled || 0}`);
+        route();
+      } catch (err) {
+        showToast(`Lỗi đồng bộ: ${err.message}`);
+      } finally {
+        btnSyncHeader.disabled = false;
+        if (syncStatusHeader) syncStatusHeader.textContent = 'Đồng bộ';
+      }
+    };
+  }
 }
 
-document.getElementById('btnCloseCatAlert').onclick = () => {
-  document.getElementById('catAlertOverlay').classList.remove('show');
-  if (catTimer) clearTimeout(catTimer);
-};
-
-function triggerRainCoinsEffect() {
+// ==========================================
+// 8. TIỆN ÍCH HIỆU ỨNG (MƯA XU, TOAST, PWA)
+// ==========================================
+export function triggerRainCoinsEffect() {
   const fxLayer = document.getElementById('fxLayer');
+  if (!fxLayer) return;
   const items = ['💰', '🪙', '💵', '✨', '💎'];
-  for (let i = 0; i < 30; i++) {
+  for (let i = 0; i < 28; i++) {
     const el = document.createElement('div');
     el.className = 'falling-item';
     el.textContent = items[Math.floor(Math.random() * items.length)];
 
     const left = Math.random() * 100;
     const duration = 1.2 + Math.random() * 1.5;
-    const delay = Math.random() * 0.6;
+    const delay = Math.random() * 0.5;
 
     el.style.left = `${left}%`;
     el.style.animationDuration = `${duration}s`;
     el.style.animationDelay = `${delay}s`;
-    el.style.fontSize = `${1.5 + Math.random()}rem`;
+    el.style.fontSize = `${1.6 + Math.random() * 0.8}rem`;
 
     fxLayer.appendChild(el);
     setTimeout(() => el.remove(), (duration + delay) * 1000);
   }
 }
 
-function showToast(msg) {
+export function showToast(msg) {
   const toast = document.getElementById('toast');
+  if (!toast) return;
   toast.textContent = msg;
   toast.classList.add('show');
-  setTimeout(() => toast.classList.remove('show'), 2800);
+  setTimeout(() => toast.classList.remove('show'), 2600);
+}
+
+function registerServiceWorker() {
+  if ('serviceWorker' in navigator && window.isSecureContext) {
+    navigator.serviceWorker.register('./sw.js').catch(err => {
+      console.log('SW Registration error:', err);
+    });
+  }
 }

@@ -1,4 +1,4 @@
-// Thành viên A — Task A03: Màn hình Thu chi & Ví (Viết đơn giản theo chuẩn kiến thức đã học)
+// Thành viên A — Task A03: Màn hình Thu chi & Ví (Giao diện chuẩn Netlify Cute Theme)
 import { CATEGORIES } from '../config.js';
 import { listRecords, saveAndQueue, generateClientUuid } from '../db.js';
 import { calculateWalletBalances, calculateTotalBalance, formatVND } from '../domain/finance.js';
@@ -8,96 +8,128 @@ let currentUser = null;
 let editingId = null;
 
 export async function render(container) {
-  // Giao diện HTML viết bằng chuỗi template quen thuộc, dễ nhìn
   container.innerHTML = `
-    <h2>Quản lý Thu chi & Ví (Thành viên A)</h2>
+    <!-- Khung tài khoản & trạng thái -->
+    <div id="auth-box" style="margin-bottom: 16px;"></div>
 
-    <!-- Khung tài khoản -->
-    <div id="auth-box" style="background:#e8f4ec; padding:15px; border-radius:8px; margin-bottom:15px;">
-      Đang kiểm tra tài khoản...
-    </div>
-
-    <!-- Khung tổng quan số dư -->
-    <div style="background:#fff; border:1px solid #ccc; padding:15px; border-radius:8px; margin-bottom:15px;">
-      <h3>Tổng tài sản: <span id="total-balance" style="color:#175c47; font-size:22px;">0 đ</span></h3>
-      <p style="color:#666; font-size:13px;">* Lưu ý: Chuyển tiền giữa 2 ví không làm thay đổi tổng tài sản.</p>
-      
-      <!-- Danh sách các ví -->
-      <div id="wallet-list" style="display:flex; gap:10px; flex-wrap:wrap; margin:10px 0;"></div>
-      
-      <!-- Form thêm ví -->
-      <div style="margin-top:10px;">
-        <input type="text" id="new-wallet-name" placeholder="Tên ví (Ví dụ: Tiền mặt, Ngân hàng)" style="padding:6px;">
-        <input type="number" id="new-wallet-balance" placeholder="Số dư ban đầu" value="0" style="padding:6px;">
-        <button type="button" id="btn-create-wallet">Thêm ví</button>
+    <!-- Khung tổng quan số dư các ví -->
+    <section class="card" style="margin-bottom: 20px;">
+      <div class="card-header-row">
+        <h2><i class="ri-wallet-3-line"></i> Quản lý các Ví & Tổng tài sản</h2>
+        <span class="muted-tag" style="background:var(--primary-light); color:var(--primary); font-weight:700;">Định luật bảo toàn tài sản</span>
       </div>
-    </div>
+      
+      <div style="margin: 12px 0 16px;">
+        <span style="font-size:0.85rem; color:var(--muted);">Tổng tài sản ròng:</span>
+        <div id="total-balance" style="font-size: 2.2rem; font-weight: 800; color: var(--primary);">0 đ</div>
+        <small style="color:var(--muted); font-size:0.8rem;">* Thao tác Chuyển tiền giữa 2 ví không làm thay đổi tổng tài sản.</small>
+      </div>
 
-    <!-- Form nhập giao dịch -->
-    <div style="background:#fff; border:1px solid #ccc; padding:15px; border-radius:8px; margin-bottom:15px;">
-      <h3 id="form-title">Thêm giao dịch mới</h3>
-      <form id="tx-form">
+      <!-- Danh sách các ví -->
+      <div id="wallet-list" style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px;"></div>
+
+      <!-- Form thêm ví mới -->
+      <div style="background:var(--bg); border:1px solid var(--line-strong); padding:14px; border-radius:var(--radius-sm);">
+        <h4 style="margin:0 0 10px 0; font-size:0.92rem;"><i class="ri-add-line"></i> Tạo thêm ví mới</h4>
+        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+          <input type="text" id="new-wallet-name" placeholder="Tên ví (vd: Tiền mặt, Techcombank, MoMo)" style="flex:2; min-width:180px;">
+          <input type="number" id="new-wallet-balance" placeholder="Số dư ban đầu" value="0" style="flex:1; min-width:130px;">
+          <button type="button" id="btn-create-wallet" class="primary" style="flex:1; min-width:120px; padding:10px;">
+            <i class="ri-add-circle-line"></i> Thêm ví
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Form nhập / sửa giao dịch -->
+    <section class="card" style="margin-bottom: 20px;">
+      <h2 id="form-title"><i class="ri-add-box-line"></i> Thêm giao dịch / Chuyển ví</h2>
+      <form id="tx-form" class="form" style="margin-top:12px;">
         <input type="hidden" id="tx-id">
 
-        <label>Loại giao dịch:</label>
-        <select id="tx-type" style="padding:6px; margin-right:10px;">
-          <option value="expense">Chi tiêu (-)</option>
-          <option value="income">Thu nhập (+)</option>
-          <option value="transfer">Chuyển ví (⇄)</option>
-        </select>
+        <div class="grid-2">
+          <div class="field">
+            <label>Loại giao dịch</label>
+            <select id="tx-type" class="select-field">
+              <option value="expense">Khoản chi (-)</option>
+              <option value="income">Khoản thu (+)</option>
+              <option value="transfer">Chuyển ví (⇄)</option>
+            </select>
+          </div>
 
-        <label>Ví thực hiện:</label>
-        <select id="tx-wallet" style="padding:6px; margin-right:10px;"></select>
+          <div class="field">
+            <label>Ví thực hiện</label>
+            <select id="tx-wallet" class="select-field"></select>
+          </div>
+        </div>
 
-        <span id="box-dest-wallet" style="display:none;">
-          <label>Ví nhận tiền:</label>
-          <select id="tx-dest-wallet" style="padding:6px; margin-right:10px;"></select>
-        </span>
+        <div class="grid-2">
+          <div class="field" id="box-dest-wallet" style="display:none;">
+            <label>Ví nhận tiền</label>
+            <select id="tx-dest-wallet" class="select-field"></select>
+          </div>
 
-        <span id="box-category">
-          <label>Danh mục:</label>
-          <select id="tx-category" style="padding:6px; margin-right:10px;"></select>
-        </span>
+          <div class="field" id="box-category">
+            <label>Danh mục</label>
+            <select id="tx-category" class="select-field"></select>
+          </div>
+        </div>
 
-        <label>Số tiền (VNĐ):</label>
-        <input type="number" id="tx-amount" placeholder="Số tiền" required min="1000" step="1000" style="padding:6px; margin-right:10px;">
+        <div class="grid-2">
+          <div class="field">
+            <label>Số tiền (VNĐ)</label>
+            <input type="number" id="tx-amount" placeholder="Nhập số tiền" required min="1000" step="1000">
+          </div>
 
-        <label>Ngày:</label>
-        <input type="date" id="tx-date" required style="padding:6px; margin-right:10px;">
+          <div class="field">
+            <label>Ngày phát sinh</label>
+            <input type="date" id="tx-date" required>
+          </div>
+        </div>
 
-        <div style="margin-top:10px;">
-          <input type="text" id="tx-note" placeholder="Ghi chú (Ví dụ: Ăn trưa, nhận học bổng...)" style="width:50%; padding:6px;">
-          <button type="submit" id="btn-save-tx">Lưu giao dịch</button>
-          <button type="button" id="btn-cancel-edit" style="display:none; background:#888;">Hủy sửa</button>
+        <div class="field">
+          <label>Ghi chú / Mô tả giao dịch</label>
+          <input type="text" id="tx-note" placeholder="Ví dụ: Ăn trưa bún bò, nhận trợ cấp gia đình..." required>
+        </div>
+
+        <div style="display:flex; gap:10px; margin-top:8px;">
+          <button type="button" id="btn-cancel-edit" class="btn-secondary" style="display:none; flex:1;">Hủy sửa</button>
+          <button type="submit" id="btn-save-tx" class="primary" style="flex:2;"><i class="ri-check-line"></i> Lưu Giao Dịch</button>
         </div>
       </form>
-    </div>
+    </section>
 
     <!-- Bảng Sổ giao dịch (Ledger) -->
-    <div style="background:#fff; border:1px solid #ccc; padding:15px; border-radius:8px;">
-      <h3>Sổ giao dịch (Ledger)</h3>
-      <table border="1" style="width:100%; border-collapse:collapse; text-align:left;">
-        <thead>
-          <tr style="background:#f0f0f0;">
-            <th style="padding:8px;">Ngày</th>
-            <th style="padding:8px;">Loại</th>
-            <th style="padding:8px;">Ví / Danh mục</th>
-            <th style="padding:8px;">Ghi chú</th>
-            <th style="padding:8px; text-align:right;">Số tiền</th>
-            <th style="padding:8px; text-align:center;">Trạng thái</th>
-            <th style="padding:8px; text-align:center;">Thao tác</th>
-          </tr>
-        </thead>
-        <tbody id="tx-table-body"></tbody>
-      </table>
-    </div>
+    <section class="card">
+      <div class="card-header-row">
+        <h2><i class="ri-book-read-line"></i> Sổ cái giao dịch (Ledger)</h2>
+        <span class="muted-tag" id="ledgerCountTag">0 bản ghi</span>
+      </div>
+      <div class="table-responsive" style="margin-top:12px;">
+        <table class="pb-table">
+          <thead>
+            <tr>
+              <th>Ngày</th>
+              <th>Loại</th>
+              <th>Ví / Danh mục</th>
+              <th>Ghi chú</th>
+              <th style="text-align:right;">Số tiền</th>
+              <th style="text-align:center;">Trạng thái</th>
+              <th style="text-align:center;">Thao tác</th>
+            </tr>
+          </thead>
+          <tbody id="tx-table-body">
+            <tr><td colspan="7" style="text-align:center; color:var(--muted); padding:20px;">Đang tải dữ liệu...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
   `;
 
-  // Thiết lập ngày mặc định là hôm nay (YYYY-MM-DD)
+  // Thiết lập ngày mặc định
   const today = new Date().toISOString().split('T')[0];
   document.getElementById('tx-date').value = today;
 
-  // Lấy các phần tử DOM
   const authBox = document.getElementById('auth-box');
   const typeSelect = document.getElementById('tx-type');
   const walletSelect = document.getElementById('tx-wallet');
@@ -108,32 +140,179 @@ export async function render(container) {
   const form = document.getElementById('tx-form');
   const btnCancel = document.getElementById('btn-cancel-edit');
 
-  // Kiểm tra tài khoản
   await checkAuth();
-
-  // Tải dữ liệu ví và giao dịch
   await loadData();
 
-  // Sự kiện khi thay đổi loại giao dịch (Thu, Chi, Chuyển ví)
   typeSelect.onchange = () => {
     updateCategorySelect();
   };
 
+  async function checkAuth() {
+    try {
+      const res = await apiRequest('auth.php?action=me');
+      currentUser = res.user;
+      authBox.innerHTML = `
+        <div style="background:var(--primary-light); border:1px solid rgba(16,185,129,0.3); padding:12px 16px; border-radius:var(--radius-sm); display:flex; justify-content:space-between; align-items:center;">
+          <span>Đang đăng nhập: <strong>${escapeHtml(currentUser.name)}</strong> (${escapeHtml(currentUser.email)})</span>
+          <span class="status-pill" data-state="online"><i class="ri-cloud-line"></i> Đã kết nối Auth</span>
+        </div>
+      `;
+    } catch {
+      currentUser = null;
+      authBox.innerHTML = `
+        <div style="background:var(--bg); border:1px solid var(--line-strong); padding:12px 16px; border-radius:var(--radius-sm); display:flex; justify-content:space-between; align-items:center;">
+          <span>Chế độ: <strong>Ngoại tuyến (Offline-First)</strong></span>
+          <a href="#system" class="status-pill-btn" style="text-decoration:none;"><i class="ri-login-box-line"></i> Đăng nhập</a>
+        </div>
+      `;
+    }
+  }
+
+  function getUserId() {
+    return currentUser ? currentUser.id : '1';
+  }
+
+  async function loadData() {
+    const userId = getUserId();
+    let wallets = await listRecords('wallets', userId);
+    let transactions = await listRecords('transactions', userId);
+
+    if (wallets.length === 0) {
+      wallets = [
+        { id: 'wallet_cash', user_id: String(userId), name: 'Ví tiền mặt', initial_balance_vnd: 0 },
+        { id: 'wallet_bank', user_id: String(userId), name: 'Ngân hàng', initial_balance_vnd: 0 },
+        { id: 'wallet_momo', user_id: String(userId), name: 'MoMo', initial_balance_vnd: 0 }
+      ];
+    }
+
+    // Chuẩn hóa dữ liệu tương thích
+    transactions = transactions.map(t => ({
+      ...t,
+      amount_vnd: Number(t.amount_vnd != null ? t.amount_vnd : (t.amount || 0)),
+      occurred_on: t.occurred_on || (t.date ? t.date.split('T')[0] : today),
+      note: t.note || t.title || 'Giao dịch',
+      type: t.type || 'expense'
+    }));
+
+    // Tính toán số dư các ví
+    const balances = calculateWalletBalances(wallets, transactions);
+    const total = calculateTotalBalance(wallets, transactions);
+
+    document.getElementById('total-balance').textContent = formatVND(total);
+
+    // Render danh sách ví
+    const walletList = document.getElementById('wallet-list');
+    walletList.innerHTML = '';
+    wallets.forEach(w => {
+      const b = balances[w.id] || 0;
+      const chip = document.createElement('div');
+      chip.className = 'card';
+      chip.style.padding = '12px 18px';
+      chip.style.flex = '1';
+      chip.style.minWidth = '140px';
+      chip.innerHTML = `
+        <div style="font-size:0.82rem; color:var(--muted);">${escapeHtml(w.name)}</div>
+        <div style="font-size:1.15rem; font-weight:800; color:var(--text); margin-top:2px;">${formatVND(b)}</div>
+      `;
+      walletList.appendChild(chip);
+    });
+
+    // Điền dữ liệu vào dropdown ví
+    walletSelect.innerHTML = '';
+    destWalletSelect.innerHTML = '';
+    wallets.forEach(w => {
+      walletSelect.innerHTML += `<option value="${w.id}">${escapeHtml(w.name)}</option>`;
+      destWalletSelect.innerHTML += `<option value="${w.id}">${escapeHtml(w.name)}</option>`;
+    });
+
+    updateCategorySelect();
+    renderTransactionsTable(transactions, wallets);
+  }
+
   function updateCategorySelect() {
     const type = typeSelect.value;
+    catSelect.innerHTML = '';
+
     if (type === 'transfer') {
-      boxDestWallet.style.display = 'inline';
+      boxDestWallet.style.display = 'block';
       boxCategory.style.display = 'none';
     } else {
       boxDestWallet.style.display = 'none';
-      boxCategory.style.display = 'inline';
-      const cats = CATEGORIES[type] || [];
-      catSelect.innerHTML = cats.map(c => `<option value="${c}">${c}</option>`).join('');
+      boxCategory.style.display = 'block';
+
+      const cats = type === 'expense' ? CATEGORIES.expense : CATEGORIES.income;
+      cats.forEach(c => {
+        catSelect.innerHTML += `<option value="${c.code}">${c.name}</option>`;
+      });
     }
   }
-  updateCategorySelect();
 
-  // Sự kiện tạo ví mới
+  function renderTransactionsTable(transactions, wallets) {
+    const tbody = document.getElementById('tx-table-body');
+    tbody.innerHTML = '';
+
+    const countTag = document.getElementById('ledgerCountTag');
+    if (countTag) countTag.textContent = `${transactions.length} bản ghi`;
+
+    if (transactions.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:var(--muted); padding:20px;">Chưa có giao dịch nào!</td></tr>';
+      return;
+    }
+
+    const sorted = [...transactions].sort((a, b) => b.occurred_on.localeCompare(a.occurred_on));
+
+    sorted.forEach(t => {
+      const tr = document.createElement('tr');
+      const wName = wallets.find(w => w.id === t.wallet_id)?.name || 'Ví tiền mặt';
+      const destWName = t.destination_wallet_id ? (wallets.find(w => w.id === t.destination_wallet_id)?.name || 'Ví đích') : '';
+
+      let typeBadge = '';
+      let amtColor = '';
+      let sign = '-';
+
+      if (t.type === 'expense') {
+        typeBadge = '<span class="chip neg" style="padding:3px 10px; font-size:0.75rem;">Chi tiêu</span>';
+        amtColor = 'var(--danger)';
+        sign = '-';
+      } else if (t.type === 'income') {
+        typeBadge = '<span class="chip pos" style="padding:3px 10px; font-size:0.75rem;">Thu nhập</span>';
+        amtColor = 'var(--primary)';
+        sign = '+';
+      } else {
+        typeBadge = '<span class="muted-tag" style="background:#e0f2fe; color:#0284c7; padding:3px 10px; font-size:0.75rem;">Chuyển ví</span>';
+        amtColor = '#0284c7';
+        sign = '⇄ ';
+      }
+
+      const syncStatus = (t.version && t.version > 0)
+        ? '<span style="color:var(--primary); font-size:0.8rem;"><i class="ri-check-double-line"></i> Đã đồng bộ</span>'
+        : '<span style="color:var(--warn); font-size:0.8rem;"><i class="ri-time-line"></i> Chờ đẩy</span>';
+
+      tr.innerHTML = `
+        <td>${t.occurred_on}</td>
+        <td>${typeBadge}</td>
+        <td>${t.type === 'transfer' ? `${escapeHtml(wName)} ➔ ${escapeHtml(destWName)}` : escapeHtml(wName)}</td>
+        <td>${escapeHtml(t.note)}</td>
+        <td style="text-align:right; font-weight:700; color:${amtColor};">${sign}${formatVND(t.amount_vnd)}</td>
+        <td style="text-align:center;">${syncStatus}</td>
+        <td style="text-align:center;">
+          <button class="btn-edit" data-id="${t.id}" style="background:none; border:none; color:var(--primary); cursor:pointer; padding:4px;" title="Sửa"><i class="ri-edit-line"></i></button>
+          <button class="btn-delete" data-id="${t.id}" style="background:none; border:none; color:var(--danger); cursor:pointer; padding:4px;" title="Xóa"><i class="ri-delete-bin-line"></i></button>
+        </td>
+      `;
+
+      tbody.appendChild(tr);
+    });
+
+    tbody.querySelectorAll('.btn-edit').forEach(btn => {
+      btn.onclick = () => onEdit(btn.getAttribute('data-id'), sorted);
+    });
+    tbody.querySelectorAll('.btn-delete').forEach(btn => {
+      btn.onclick = () => onDelete(btn.getAttribute('data-id'));
+    });
+  }
+
+  // Thêm ví mới
   document.getElementById('btn-create-wallet').onclick = async () => {
     const nameInput = document.getElementById('new-wallet-name');
     const balanceInput = document.getElementById('new-wallet-balance');
@@ -141,20 +320,21 @@ export async function render(container) {
     const balance = parseInt(balanceInput.value, 10) || 0;
 
     if (!name) {
-      alert('Vui lòng nhập tên ví!');
+      alert('Vui lòng nhập tên ví.');
       return;
     }
 
-    const userId = currentUser ? currentUser.id : '1';
+    const userId = getUserId();
     const newWallet = {
       id: generateClientUuid(),
-      name,
-      opening_balance_vnd: balance,
-      version: 1
+      user_id: String(userId),
+      name: name,
+      initial_balance_vnd: balance,
+      created_at: new Date().toISOString()
     };
 
     await saveAndQueue({
-      user_id: userId,
+      user_id: String(userId),
       entity: 'wallet',
       action: 'upsert',
       record: newWallet
@@ -165,231 +345,103 @@ export async function render(container) {
     await loadData();
   };
 
-  // Sự kiện gửi Form giao dịch (Thêm mới hoặc Cập nhật)
+  // Submit Form Lưu Giao Dịch
   form.onsubmit = async (e) => {
     e.preventDefault();
+    const userId = getUserId();
 
-    const userId = currentUser ? currentUser.id : '1';
     const type = typeSelect.value;
     const walletId = walletSelect.value;
     const destWalletId = (type === 'transfer') ? destWalletSelect.value : null;
-    const category = (type === 'transfer') ? null : catSelect.value;
+    const catCode = (type === 'transfer') ? null : catSelect.value;
     const amount = parseInt(document.getElementById('tx-amount').value, 10);
     const date = document.getElementById('tx-date').value;
     const note = document.getElementById('tx-note').value.trim();
 
-    if (!walletId) {
-      alert('Vui lòng chọn ví!');
+    if (type === 'transfer' && walletId === destWalletId) {
+      alert('Ví nhận tiền phải khác ví chuyển.');
       return;
     }
 
-    if (type === 'transfer' && (!destWalletId || destWalletId === walletId)) {
-      alert('Ví nhận tiền phải khác ví gửi!');
-      return;
-    }
-
+    const txId = editingId ? editingId : generateClientUuid();
     const txRecord = {
-      id: editingId ? editingId : generateClientUuid(),
+      id: txId,
+      user_id: String(userId),
       wallet_id: walletId,
       destination_wallet_id: destWalletId,
-      type,
+      type: type,
       amount_vnd: amount,
-      category_code: category,
+      amount: amount,
+      category_code: catCode,
       occurred_on: date,
-      note,
-      version: 1
+      date: new Date(date + 'T12:00:00').toISOString(),
+      note: note,
+      title: note,
+      version: 1,
+      updated_at: new Date().toISOString()
     };
 
     await saveAndQueue({
-      user_id: userId,
+      user_id: String(userId),
       entity: 'transaction',
       action: 'upsert',
       record: txRecord
     });
 
-    // Reset form
-    form.reset();
-    document.getElementById('tx-date').value = today;
-    editingId = null;
-    document.getElementById('form-title').textContent = 'Thêm giao dịch mới';
-    btnCancel.style.display = 'none';
-    updateCategorySelect();
-
+    resetForm();
     await loadData();
   };
 
-  btnCancel.onclick = () => {
+  function onEdit(id, transactions) {
+    const t = transactions.find(item => item.id === id);
+    if (!t) return;
+
+    editingId = id;
+    document.getElementById('form-title').innerHTML = `<i class="ri-edit-line"></i> Sửa giao dịch (#${id.slice(0, 8)})`;
+    typeSelect.value = t.type;
+    updateCategorySelect();
+
+    walletSelect.value = t.wallet_id;
+    if (t.type === 'transfer' && t.destination_wallet_id) {
+      destWalletSelect.value = t.destination_wallet_id;
+    }
+    if (t.category_code) {
+      catSelect.value = t.category_code;
+    }
+
+    document.getElementById('tx-amount').value = t.amount_vnd;
+    document.getElementById('tx-date').value = t.occurred_on;
+    document.getElementById('tx-note').value = t.note;
+
+    btnCancel.style.display = 'inline-block';
+  }
+
+  async function onDelete(id) {
+    if (!confirm('Bạn có chắc muốn xóa giao dịch này không?')) return;
+    const userId = getUserId();
+    await saveAndQueue({
+      user_id: String(userId),
+      entity: 'transaction',
+      action: 'delete',
+      record: { id }
+    });
+    await loadData();
+  }
+
+  function resetForm() {
     editingId = null;
+    document.getElementById('form-title').innerHTML = '<i class="ri-add-box-line"></i> Thêm giao dịch / Chuyển ví';
     form.reset();
     document.getElementById('tx-date').value = today;
-    document.getElementById('form-title').textContent = 'Thêm giao dịch mới';
-    btnCancel.style.display = 'none';
+    typeSelect.value = 'expense';
     updateCategorySelect();
-  };
-
-  // Hàm tải dữ liệu ví và giao dịch từ IndexedDB
-  async function loadData() {
-    const userId = currentUser ? currentUser.id : '1';
-    const wallets = await listRecords('wallets', userId);
-    const transactions = await listRecords('transactions', userId);
-
-    // 1. Tính toán số dư
-    const balances = calculateWalletBalances(wallets, transactions);
-    const total = calculateTotalBalance(wallets, transactions);
-    document.getElementById('total-balance').textContent = formatVND(total);
-
-    // 2. Hiển thị thẻ ví
-    const walletList = document.getElementById('wallet-list');
-    walletList.innerHTML = '';
-    walletSelect.innerHTML = '';
-    destWalletSelect.innerHTML = '<option value="">-- Chọn ví nhận --</option>';
-
-    wallets.forEach(w => {
-      const bal = balances.get(w.id) ?? w.opening_balance_vnd;
-      walletList.innerHTML += `
-        <div style="border:1px solid #175c47; background:#f4faf6; padding:8px 12px; border-radius:6px;">
-          <strong>${w.name}</strong>: ${formatVND(bal)}
-        </div>
-      `;
-      walletSelect.innerHTML += `<option value="${w.id}">${w.name}</option>`;
-      destWalletSelect.innerHTML += `<option value="${w.id}">${w.name}</option>`;
-    });
-
-    // 3. Hiển thị bảng giao dịch
-    const tbody = document.getElementById('tx-table-body');
-    tbody.innerHTML = '';
-
-    if (transactions.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:10px;">Chưa có giao dịch nào.</td></tr>';
-      return;
-    }
-
-    const walletMap = new Map(wallets.map(w => [w.id, w.name]));
-
-    // Sắp xếp ngày mới nhất lên đầu
-    transactions.sort((a, b) => (b.occurred_on || '').localeCompare(a.occurred_on || ''));
-
-    transactions.forEach(tx => {
-      const wName = walletMap.get(tx.wallet_id) || 'Ví';
-      let typeLabel = '';
-      let detail = '';
-      let amountColor = '#000';
-      let sign = '';
-
-      if (tx.type === 'income') {
-        typeLabel = '<span style="color:green; font-weight:bold;">Thu</span>';
-        detail = `${wName} · ${tx.category_code || ''}`;
-        amountColor = 'green';
-        sign = '+';
-      } else if (tx.type === 'expense') {
-        typeLabel = '<span style="color:red; font-weight:bold;">Chi</span>';
-        detail = `${wName} · ${tx.category_code || ''}`;
-        amountColor = 'red';
-        sign = '-';
-      } else if (tx.type === 'transfer') {
-        typeLabel = '<span style="color:blue; font-weight:bold;">Chuyển</span>';
-        const dName = walletMap.get(tx.destination_wallet_id) || 'Ví đích';
-        detail = `${wName} ➔ ${dName}`;
-        amountColor = '#333';
-        sign = '⇄';
-      }
-
-      const syncBadge = (tx.sync_status === 'pending')
-        ? '<span style="background:#fff3cd; color:#856404; padding:2px 6px; border-radius:4px; font-size:12px;">Chờ sync</span>'
-        : '<span style="background:#d4edda; color:#155724; padding:2px 6px; border-radius:4px; font-size:12px;">Đã sync</span>';
-
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td style="padding:8px;">${tx.occurred_on}</td>
-        <td style="padding:8px;">${typeLabel}</td>
-        <td style="padding:8px;">${detail}</td>
-        <td style="padding:8px;">${tx.note || ''}</td>
-        <td style="padding:8px; text-align:right; font-weight:bold; color:${amountColor};">${sign} ${formatVND(tx.amount_vnd)}</td>
-        <td style="padding:8px; text-align:center;">${syncBadge}</td>
-        <td style="padding:8px; text-align:center;">
-          <button type="button" class="btn-edit" style="padding:3px 8px; font-size:12px;">Sửa</button>
-          <button type="button" class="btn-del" style="background:#d9534f; padding:3px 8px; font-size:12px;">Xóa</button>
-        </td>
-      `;
-
-      // Nút Sửa
-      tr.querySelector('.btn-edit').onclick = () => {
-        editingId = tx.id;
-        document.getElementById('form-title').textContent = 'Chỉnh sửa giao dịch';
-        btnCancel.style.display = 'inline';
-        typeSelect.value = tx.type;
-        updateCategorySelect();
-        walletSelect.value = tx.wallet_id;
-        if (tx.type === 'transfer') destWalletSelect.value = tx.destination_wallet_id || '';
-        else catSelect.value = tx.category_code || '';
-        document.getElementById('tx-amount').value = tx.amount_vnd;
-        document.getElementById('tx-date').value = tx.occurred_on;
-        document.getElementById('tx-note').value = tx.note || '';
-        form.scrollIntoView({ behavior: 'smooth' });
-      };
-
-      // Nút Xóa
-      tr.querySelector('.btn-del').onclick = async () => {
-        if (!confirm('Bạn có chắc muốn xóa giao dịch này?')) return;
-        await saveAndQueue({
-          user_id: userId,
-          entity: 'transaction',
-          action: 'delete',
-          record: tx
-        });
-        await loadData();
-      };
-
-      tbody.appendChild(tr);
-    });
+    btnCancel.style.display = 'none';
   }
 
-  // Hàm kiểm tra và vẽ trạng thái đăng nhập
-  async function checkAuth() {
-    try {
-      const res = await apiRequest('auth.php?action=me');
-      currentUser = res.user;
-    } catch {
-      currentUser = null;
-    }
+  btnCancel.onclick = resetForm;
+}
 
-    if (currentUser) {
-      authBox.innerHTML = `
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-          <div>
-            Xin chào: <strong>${currentUser.name}</strong> (${currentUser.email}) - [ID: ${currentUser.id}]
-          </div>
-          <button type="button" id="btn-logout" style="background:#c9302c; padding:6px 12px; font-size:12px;">Đăng xuất</button>
-        </div>
-      `;
-      document.getElementById('btn-logout').onclick = async () => {
-        await apiRequest('auth.php?action=logout', { method: 'POST' });
-        currentUser = null;
-        await checkAuth();
-        await loadData();
-      };
-    } else {
-      authBox.innerHTML = `
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-          <div>Bạn chưa đăng nhập server. Dữ liệu đang được lưu offline trên máy.</div>
-          <div>
-            <button type="button" id="btn-login-demo" style="padding:6px 12px; font-size:12px;">Đăng nhập Demo</button>
-          </div>
-        </div>
-      `;
-      document.getElementById('btn-login-demo').onclick = async () => {
-        try {
-          const res = await apiRequest('auth.php?action=login', {
-            method: 'POST',
-            body: { email: 'demo@pocketbudget.local', password: 'pocketbudget123' }
-          });
-          currentUser = res.user;
-          await checkAuth();
-          await loadData();
-        } catch (err) {
-          alert('Chưa thể đăng nhập demo: ' + err.message);
-        }
-      };
-    }
-  }
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m]);
 }
