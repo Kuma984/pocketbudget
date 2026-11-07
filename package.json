@@ -1,0 +1,15 @@
+{
+  "name": "pocketbudget-starter",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Scaffold only; product features are team TODOs",
+  "scripts": {
+    "preview": "node tools/preview.mjs",
+    "check": "node tools/check.mjs",
+    "test": "node --test tests/finance.test.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

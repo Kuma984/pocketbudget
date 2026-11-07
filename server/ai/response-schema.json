@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocketbudget.example/schema/ai-response",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "intent"
+  ],
+  "properties": {
+    "intent": {
+      "enum": [
+        "expense_summary",
+        "simulate_purchase",
+        "draft_transaction",
+        "unsupported"
+      ]
+    },
+    "reply": {
+      "type": "string",
+      "maxLength": 2000
+    },
+    "item_name": {
+      "type": "string",
+      "maxLength": 120
+    },
+    "price_vnd": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "period": {
+      "type": "string",
+      "maxLength": 32
+    },
+    "category_code": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "draft": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "enum": [
+            "income",
+            "expense",
+            "transfer"
+          ]
+        },
+        "amount_vnd": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "wallet_id": {
+          "type": "string"
+        },
+        "destination_wallet_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "category_code": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "occurred_on": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "note": {
+          "type": "string",
+          "maxLength": 500
+        }
+      }
+    },
+    "missing_fields": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    }
+  }
+}

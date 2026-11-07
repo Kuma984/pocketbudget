@@ -1,0 +1,110 @@
+<?php
+declare(strict_types=1);
+
+require_once __DIR__ . '/../../server/bootstrap.php';
+
+$pdo = get_db();
+start_session();
+
+$action = $_GET['action'] ?? '';
+$input = get_json_input();
+
+// 1. ĐĂNG KÝ (REGISTER)
+if ($action === 'register') {
+    $name = trim($input['name'] ?? '');
+    $email = trim($input['email'] ?? '');
+    $password = $input['password'] ?? '';
+
+    if ($name === '' || $email === '' || $password === '') {
+        json_response(['ok' => false, 'error' => ['message' => 'Vui lòng điền đầy đủ họ tên, email và mật khẩu.']], 400);
+    }
+
+    // Kiểm tra xem email đã tồn tại chưa
+    $check = $pdo->prepare('SELECT id FROM users WHERE email = ?');
+    $check->execute([$email]);
+    if ($check->fetch()) {
+        json_response(['ok' => false, 'error' => ['message' => 'Email này đã được đăng ký.']], 409);
+    }
+
+    // Mã hóa mật khẩu và lưu vào bảng users
+    $hash = password_hash($password, PASSWORD_DEFAULT);
+    $stmt = $pdo->prepare('INSERT INTO users (name, email, password_hash) VALUES (?, ?, ?)');
+    $stmt->execute([$name, $email, $hash]);
+    $userId = (int)$pdo->lastInsertId();
+
+    // Tạo sẵn 1 chiếc ví "Tiền mặt" cho người dùng mới
+    $walletId = simple_uuid();
+    $stmtWallet = $pdo->prepare('INSERT INTO wallets (id, user_id, name, opening_balance_vnd, version) VALUES (?, ?, ?, ?, 1)');
+    $stmtWallet->execute([$walletId, $userId, 'Tiền mặt', 0]);
+
+    // Lưu phiên đăng nhập
+    $_SESSION['user_id'] = $userId;
+
+    json_response([
+        'ok' => true,
+        'data' => [
+            'user' => ['id' => (string)$userId, 'name' => $name, 'email' => $email],
+            'csrf_token' => 'token-ok'
+        ]
+    ]);
+}
+
+// 2. ĐĂNG NHẬP (LOGIN)
+if ($action === 'login') {
+    $email = trim($input['email'] ?? '');
+    $password = $input['password'] ?? '';
+
+    $stmt = $pdo->prepare('SELECT id, name, email, password_hash FROM users WHERE email = ?');
+    $stmt->execute([$email]);
+    $user = $stmt->fetch();
+
+    if (!$user || !password_verify($password, $user['password_hash'])) {
+        json_response(['ok' => false, 'error' => ['message' => 'Email hoặc mật khẩu không chính xác.']], 401);
+    }
+
+    // Lưu ID người dùng vào session
+    $_SESSION['user_id'] = (int)$user['id'];
+
+    json_response([
+        'ok' => true,
+        'data' => [
+            'user' => ['id' => (string)$user['id'], 'name' => $user['name'], 'email' => $user['email']],
+            'csrf_token' => 'token-ok'
+        ]
+    ]);
+}
+
+// 3. LẤY THÔNG TIN TÀI KHOẢN HIỆN TẠI (ME)
+if ($action === 'me') {
+    $userId = get_logged_in_user_id();
+    if ($userId === null) {
+        json_response(['ok' => false, 'error' => ['code' => 'UNAUTHORIZED', 'message' => 'Chưa đăng nhập.']], 401);
+    }
+
+    $stmt = $pdo->prepare('SELECT id, name, email FROM users WHERE id = ?');
+    $stmt->execute([$userId]);
+    $user = $stmt->fetch();
+
+    if (!$user) {
+        session_destroy();
+        json_response(['ok' => false, 'error' => ['code' => 'UNAUTHORIZED', 'message' => 'Tài khoản không tồn tại.']], 401);
+    }
+
+    json_response([
+        'ok' => true,
+        'data' => [
+            'user' => ['id' => (string)$user['id'], 'name' => $user['name'], 'email' => $user['email']],
+            'csrf_token' => 'token-ok'
+        ]
+    ]);
+}
+
+// 4. ĐĂNG XUẤT (LOGOUT)
+if ($action === 'logout') {
+    $_SESSION = [];
+    session_destroy();
+    json_response(['ok' => true, 'data' => null]);
+}
+
+// Nếu action không hợp lệ
+json_response(['ok' => false, 'error' => ['message' => 'Action không hợp lệ.']], 400);
