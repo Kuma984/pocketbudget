@@ -9,16 +9,16 @@ const labels = { considering: 'Đang chờ', bought: 'Đã mua', skipped: 'Bỏ 
 export function render(container) {
   const root = el('section', null, { class: 'card c-module' });
   container.replaceChildren(root);
-  const status = el('p', 'Đang lấy dữ liệu trên thiết bị…', { role: 'status' });
+  const status = el('p', 'Đang lấy dữ liệu trên thiết bị…', { role: 'status', class: 'c-status' });
   const body = el('div');
   const draftArea = el('div');
-  root.append(el('h2', 'Danh sách chờ mua'), el('p', 'Lưu món muốn mua và chọn ngày xem lại. Đưa món vào danh sách chưa làm thay đổi số dư.'), status, body, draftArea);
+  root.append(el('h2', 'Danh sách chờ mua'), el('p', 'Lưu món muốn mua và chọn ngày xem lại. Đưa món vào danh sách chưa làm thay đổi số dư.', { class: 'section-desc' }), status, body, draftArea);
   const preset = takeWishlistPreset();
   let current;
   let editing = null;
   let busy = false;
   let rows = [];
-  const form = el('form', null, { class: 'c-grid' });
+  const form = el('form', null, { class: 'form c-grid' });
   const name = field(form, 'Tên món', 'wishlist-name', { maxlength: '120', required: '', value: preset?.name ?? '' });
   const price = field(form, 'Giá dự kiến (đ)', 'wishlist-price', { type: 'number', min: '1', step: '1', required: '', value: preset?.price_vnd ?? '' });
   const review = field(form, 'Ngày xem lại', 'wishlist-review', { type: 'date', required: '', value: todayLocal() });
@@ -26,7 +26,7 @@ export function render(container) {
   const save = action('Thêm món', 'submit');
   const reset = action('Bỏ chỉnh sửa');
   reset.hidden = true;
-  const list = el('div');
+  const list = el('div', null, { class: 'c-list' });
   actions.append(save, reset); form.append(actions);
   const resetForm = () => {
     editing = null; form.reset(); review.value = todayLocal(); save.textContent = 'Thêm món'; reset.hidden = true;
@@ -34,7 +34,7 @@ export function render(container) {
   reset.addEventListener('click', resetForm);
   function draw() {
     list.replaceChildren();
-    if (!rows.length) { list.append(el('p', 'Chưa có món nào trong danh sách.')); return; }
+    if (!rows.length) { list.append(el('p', 'Chưa có món nào trong danh sách. Thêm món ở trên hoặc từ màn Mô phỏng.', { class: 'c-muted' })); return; }
     const now = todayLocal();
     const ordered = [...rows].sort((a, b) => String(a.review_on).localeCompare(String(b.review_on)));
     for (const row of ordered) {
@@ -46,7 +46,7 @@ export function render(container) {
         const simulate = action('Mô phỏng');
         const buy = action('Đã mua…');
         const skip = action('Bỏ qua');
-        const rowActions = el('div', null, { class: 'c-actions' });
+        const rowActions = el('div', null, { class: 'c-row-actions' });
         rowActions.append(edit, simulate, buy, skip); entry.append(rowActions);
         edit.addEventListener('click', () => {
           editing = row.id; name.value = row.name; price.value = row.price_vnd; review.value = row.review_on;

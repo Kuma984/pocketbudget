@@ -234,7 +234,7 @@ export async function render(container) {
     const walletList = document.getElementById('wallet-list');
     walletList.innerHTML = '';
     wallets.forEach(w => {
-      const b = balances[w.id] || 0;
+      const b = balances.get(w.id) || 0; // calculateWalletBalances trả về Map
       const chip = document.createElement('div');
       chip.className = 'card';
       chip.style.padding = '12px 18px';
@@ -363,6 +363,7 @@ export async function render(container) {
       id: generateClientUuid(),
       user_id: String(userId),
       name: name,
+      opening_balance_vnd: balance, // tên trường theo contract/schema
       initial_balance_vnd: balance,
       created_at: new Date().toISOString()
     };

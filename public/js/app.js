@@ -2,7 +2,7 @@
 // Tích hợp toàn diện Thành viên A (Core & Backend), Thành viên B (PWA & Dashboard), Thành viên C (Simulation & AI)
 import { render as dashboard } from './modules/dashboard.js';
 import { render as transactions } from './modules/transactions.js';
-import { render as budget } from './modules/budget.js';
+import { render as budget, currentMonthKey, readMonthBudgetLimit, saveMonthBudget } from './modules/budget.js';
 import { render as simulation } from './modules/simulation.js';
 import { render as wishlist } from './modules/wishlist.js';
 import { render as chat } from './modules/chat.js';
@@ -408,12 +408,21 @@ export function closeCatAlert() {
 // ==========================================
 // 6. MODAL ĐẶT NGÂN SÁCH THÁNG
 // ==========================================
-function openBudgetModal() {
-  const current = Number(localStorage.getItem('user_monthly_budget')) || 3000000;
+// Cùng đường ghi với tab Ngân sách (IndexedDB + outbox), không ghi riêng vào localStorage nữa:
+// trước đây nút này chỉ đổi localStorage nên Tổng quan đổi theo còn Mô phỏng (đọc IndexedDB) thì không.
+async function openBudgetModal() {
   const input = document.getElementById('monthlyBudgetInput');
-  if (input) input.value = current;
   const modal = document.getElementById('budgetModal');
-  if (modal) modal.classList.add('show');
+  if (!input || !modal) return;
+  input.value = '';
+  try {
+    const limit = await readMonthBudgetLimit(currentUserId(), currentMonthKey());
+    input.value = limit ?? '';
+  } catch (err) {
+    console.warn('Không đọc được hạn mức tháng:', err);
+  }
+  input.placeholder = 'Ví dụ: 3000000';
+  modal.classList.add('show');
 }
 
 function closeBudgetModal() {
@@ -421,16 +430,28 @@ function closeBudgetModal() {
   if (modal) modal.classList.remove('show');
 }
 
-function saveMonthlyBudget() {
+function currentUserId() {
+  return currentUser ? String(currentUser.id) : '1';
+}
+
+async function saveMonthlyBudget() {
   const input = document.getElementById('monthlyBudgetInput');
   const val = Number(input.value);
-  if (val && val > 0) {
-    localStorage.setItem('user_monthly_budget', val);
+  if (!Number.isSafeInteger(val) || val <= 0) {
+    alert('Vui lòng nhập hạn mức là số nguyên lớn hơn 0 VNĐ.');
+    return;
+  }
+  const btn = document.getElementById('btnSaveBudget');
+  if (btn) btn.disabled = true;
+  try {
+    await saveMonthBudget(currentUserId(), currentMonthKey(), val);
     closeBudgetModal();
-    showToast('Đã cập nhật ngân sách tháng thành công!');
+    showToast('Đã lưu hạn mức tháng trên máy, chờ đồng bộ.');
     route();
-  } else {
-    alert('Vui lòng nhập số tiền ngân sách hợp lệ (> 0 VNĐ)');
+  } catch (err) {
+    alert('Chưa lưu được hạn mức: ' + err.message);
+  } finally {
+    if (btn) btn.disabled = false;
   }
 }
 

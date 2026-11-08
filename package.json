@@ -7,7 +7,7 @@
   "scripts": {
     "preview": "node tools/preview.mjs",
     "check": "node tools/check.mjs",
-    "test": "node --test tests/finance.test.js"
+    "test": "node --test tests/finance.test.js tests/member-c.test.js tests/pwa-integration.test.js tests/budget-sync.test.js"
   },
   "engines": {
     "node": ">=20"

@@ -1,6 +1,6 @@
 // Cache the shell only. API writes/reads belong to app sync, never fake JSON from HTML.
 const PREFIX = `pocketbudget-shell:${self.registration.scope}:`;
-const CACHE = `${PREFIX}v18`;
+const CACHE = `${PREFIX}v19`;
 
 const ASSETS = [
   "./",
@@ -92,23 +92,22 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Static assets: Cache-First with ignoreSearch for query strings like ?v=17
+  // Static assets: Network-first, cache fallback when offline.
+  // Trước đây là cache-first + ignoreSearch: nếu sw.js không đổi tên cache thì trình duyệt đã mở bản cũ
+  // tiếp tục nhận CSS/JS cũ dù server đã có file mới và index.html đã đổi ?v=. Network-first vẫn giữ
+  // app shell offline nhưng không giữ CSS/JS lỗi thời khi máy chủ truy cập được.
   if (CLEAN_ASSET_PATHS.has(url.pathname)) {
     event.respondWith(
-      caches.open(CACHE).then(async cache => {
-        const cached = await cache.match(request, { ignoreSearch: true });
-        if (cached) return cached;
-
-        const fallbackCached = await cache.match(url.pathname);
-        if (fallbackCached) return fallbackCached;
-
-        return fetch(request).then(response => {
+      fetch(request, { cache: 'no-cache' })
+        .then(response => {
           if (response && response.status === 200) {
-            cache.put(request, response.clone());
+            const clone = response.clone();
+            caches.open(CACHE).then(cache => cache.put(url.pathname, clone));
           }
           return response;
-        });
-      })
+        })
+        .catch(() => caches.open(CACHE).then(async cache =>
+          (await cache.match(request, { ignoreSearch: true })) || cache.match(url.pathname)))
     );
   }
 });

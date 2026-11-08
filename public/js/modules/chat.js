@@ -4,32 +4,48 @@ import { renderDraft } from './c-draft.js';
 import { action, categoryLabels, el, expenseSummary, field, money, say, todayLocal } from './c-tools.js';
 import { isValidAmount } from '../domain/finance.js';
 
+// Câu mẫu hiển thị cho người dùng (không phải system prompt). Bấm để điền vào ô chat.
 const examples = [
-  'Mô phỏng mua tai nghe 400k',
-  'Tạo bản nháp ăn trưa 45k hôm nay',
-  'Tháng này chi ăn uống bao nhiêu?',
+  ['Hỏi tổng chi', 'Tháng này chi ăn uống bao nhiêu?'],
+  ['Mô phỏng khoản mua', 'Mô phỏng mua tai nghe 400k.'],
+  ['Tạo bản nháp', 'Tạo bản nháp chi 45k ăn trưa hôm nay.'],
 ];
 
 export function render(container) {
   const root = el('section', null, { class: 'card c-module' });
   container.replaceChildren(root);
-  const status = el('p', 'Cần đăng nhập và kết nối tới máy chạy Ollama.', { role: 'status' });
-  const form = el('form');
-  const message = field(form, 'Câu hỏi của bạn', 'chat-message', { tag: 'textarea', required: '', maxlength: '500', rows: '3' });
+  const status = el('p', 'Cần đăng nhập và kết nối tới máy chạy Ollama.', { role: 'status', class: 'c-status' });
+  const form = el('form', null, { class: 'form' });
+  const message = field(form, 'Câu hỏi của bạn', 'chat-message', { tag: 'textarea', required: '', maxlength: '500', rows: '3', placeholder: 'Ví dụ: Tháng này chi ăn uống bao nhiêu?' });
   const actions = el('div', null, { class: 'c-actions' });
   const submit = action('Gửi câu hỏi', 'submit');
   const fallback = action('Mở mô phỏng thủ công');
   fallback.addEventListener('click', () => openSimulation(null));
-  actions.append(submit, fallback);
+  const secondary = el('div', null, { class: 'c-actions-secondary' });
+  secondary.append(fallback);
+  actions.append(submit, secondary);
   form.append(actions);
-  const prompts = el('div', null, { class: 'c-actions' });
-  for (const example of examples) {
-    const button = action(example);
+
+  const guide = el('section', null, { class: 'c-guide', 'aria-labelledby': 'c-guide-title' });
+  guide.append(el('h3', 'Cách dùng chatbot', { id: 'c-guide-title' }));
+  const sampleList = el('ul', null, { class: 'c-guide-samples' });
+  for (const [label, example] of examples) {
+    const li = el('li');
+    const button = el('button', null, { type: 'button', class: 'c-sample', title: 'Điền câu này vào ô chat' });
+    button.append(el('span', label, { class: 'c-sample-label' }), el('span', '“' + example + '”', { class: 'c-sample-text' }));
     button.addEventListener('click', () => { message.value = example; message.focus(); });
-    prompts.append(button);
+    li.append(button);
+    sampleList.append(li);
   }
+  const rules = el('ul', null, { class: 'c-guide-rules' });
+  for (const rule of [
+    'Mỗi lần hỏi một việc. Kiểm tra số tiền, ngày và ví trước khi xác nhận. Bot không tự lưu giao dịch.',
+    'Không nhập mật khẩu, OTP hoặc số thẻ. Nếu không kết nối được chatbot, vẫn dùng Thu chi và Mô phỏng thủ công được.',
+  ]) rules.append(el('li', rule));
+  guide.append(sampleList, el('p', 'Bấm vào một câu mẫu để điền vào ô chat.', { class: 'c-muted c-guide-hint' }), rules);
+
   const output = el('section', null, { class: 'c-chat-result', 'aria-live': 'polite' });
-  root.append(el('h2', 'Chatbot local'), el('p', 'Hỏi về chi tiêu, thử một khoản mua hoặc tạo bản nháp. Chatbot không tự ghi giao dịch.'), prompts, form, status, output);
+  root.append(el('h2', 'Trợ lý AI'), el('p', 'Hỏi về chi tiêu, thử một khoản mua hoặc tạo bản nháp. Chatbot chạy local qua máy chủ của nhóm.', { class: 'section-desc' }), guide, form, status, output);
   let busy = false;
   form.addEventListener('submit', async event => {
     event.preventDefault();
