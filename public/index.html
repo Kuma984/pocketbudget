@@ -18,10 +18,21 @@
   <link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
   <meta name="theme-color" content="#f8fafc">
 
-  <link rel="stylesheet" href="css/layout.css">
-  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/layout.css?v=7">
+  <link rel="stylesheet" href="css/components.css?v=7">
 </head>
 <body>
+
+  <!-- Màn Hình Mở Đầu (Splash Screen) -->
+  <div class="splash-screen" id="splashScreen">
+    <div class="falling-container" id="fallingContainer"></div>
+    <div class="splash-card">
+      <div class="splash-logo">🐱💰</div>
+      <h1 class="splash-title">PocketBudget</h1>
+      <p class="splash-sub">Quản lý chi tiêu sinh viên thông minh</p>
+      <div class="splash-loader"></div>
+    </div>
+  </div>
 
   <!-- Modal Đăng Ký Tên Lần Đầu (Onboarding) -->
   <div class="onboard-modal" id="onboardModal" style="display: none;">
@@ -30,14 +41,14 @@
       <h2>Chào mừng bạn học sinh!</h2>
       <p>Nhập tên của bạn để Mèo con nhận diện chủ nhân nhé:</p>
       <input type="text" id="userNameInput" placeholder="Nhập tên của bạn (vd: Châm)...">
-      <button class="primary" type="button" id="btnSaveName"><i class="ri-heart-3-fill"></i> Bắt đầu ngay</button>
+      <button class="primary jelly-btn" type="button" id="btnSaveName"><i class="ri-heart-3-fill"></i> Bắt đầu ngay</button>
     </div>
   </div>
 
   <!-- Topbar Header -->
   <header class="topbar">
     <div class="brand">
-      <div class="logo">
+      <div class="logo coin-wiggle-trigger">
         <i class="ri-wallet-3-line"></i>
       </div>
       <div>
@@ -46,8 +57,8 @@
       </div>
     </div>
     <div class="pills">
-      <button class="status-pill-btn" id="btnOpenBudgetModal"><i class="ri-settings-4-line"></i> Đặt Ngân Sách</button>
-      <button class="status-pill-btn" id="btnSyncHeader" title="Đồng bộ dữ liệu hai chiều với MySQL"><i class="ri-refresh-line"></i> <span id="syncStatusHeader">Đồng bộ</span></button>
+      <button class="status-pill-btn jelly-btn" id="btnOpenBudgetModal"><i class="ri-settings-4-line"></i> Đặt Ngân Sách</button>
+      <button class="status-pill-btn jelly-btn" id="btnSyncHeader" title="Đồng bộ dữ liệu hai chiều với MySQL"><i class="ri-refresh-line"></i> <span id="syncStatusHeader">Đồng bộ</span></button>
       <span class="status-pill" id="network" data-state="online"><i class="ri-wifi-line"></i> Online</span>
     </div>
   </header>
@@ -55,22 +66,25 @@
   <!-- Navigation Tabs (Thành viên A + B + C) -->
   <nav class="app-nav" aria-label="Chức năng môn học">
     <a href="#dashboard" class="nav-pill" aria-current="page"><i class="ri-dashboard-line"></i> Tổng quan</a>
-    <a href="#transactions" class="nav-pill"><i class="ri-exchange-dollar-line"></i> Thu chi & ví</a>
+    <a href="#transactions" class="nav-pill"><i class="ri-exchange-dollar-line"></i> Thu chi</a>
     <a href="#budget" class="nav-pill"><i class="ri-money-dollar-circle-line"></i> Ngân sách</a>
     <a href="#simulation" class="nav-pill"><i class="ri-calculator-line"></i> Mô phỏng</a>
     <a href="#wishlist" class="nav-pill"><i class="ri-heart-line"></i> Chờ mua</a>
     <a href="#chat" class="nav-pill"><i class="ri-chat-smile-2-line"></i> Trợ lý AI</a>
-    <a href="#system" class="nav-pill"><i class="ri-shield-check-line"></i> Máy chủ & Auth</a>
+    <a href="#system" class="nav-pill" id="navSystem"><i class="ri-shield-check-line"></i> Máy chủ</a>
   </nav>
 
-  <!-- POPUP CON MÈO NHÀO RA KHI XÀI LỐ (Tự động tắt sau 5s hoặc bấm x) -->
+  <!-- POPUP CON MÈO NHÀO RA KHI XÀI LỐ -->
   <div class="cat-alert-overlay" id="catAlertOverlay">
-    <div class="cat-alert-card">
-      <button class="cat-alert-close" id="btnCloseCatAlert"><i class="ri-close-line"></i></button>
+    <div class="cat-alert-card" id="catAlertCard">
+      <button class="cat-alert-close jelly-btn" id="btnCloseCatAlert"><i class="ri-close-line"></i></button>
       <div class="cat-speech-bubble-pop">
         COI MÁ NÀY SÀI TIỀN KÌA TRỜI 😭
       </div>
-      <img id="catAlertImg" src="https://images.unsplash.com/photo-1543852786-1cf6624b9987?w=400" alt="Mèo Meme Chấm Hỏi" class="cat-pop-img">
+      <div class="cat-img-wrapper">
+        <img id="catAlertImg" src="https://images.unsplash.com/photo-1543852786-1cf6624b9987?w=400" alt="Mèo Meme Chấm Hỏi" class="cat-pop-img">
+        <div class="flying-money-burst" id="catMoneyBurst"></div>
+      </div>
     </div>
   </div>
 
@@ -79,8 +93,8 @@
     <div class="view" id="content"></div>
   </main>
 
-  <!-- Nút Chụp Ảnh Nổi (Camera Nổi) -->
-  <button class="camera-btn" id="openCamBtn" title="Chụp ảnh / Quét hóa đơn AI">
+  <!-- Nút Chụp Ảnh Nổi (Camera Nổi với Vòng Sáng Nhấp Nháy) -->
+  <button class="camera-btn jelly-btn glowing-pulse" id="openCamBtn" title="Chụp ảnh / Quét hóa đơn AI">
     <i class="ri-camera-fill"></i>
   </button>
 
@@ -89,14 +103,14 @@
     <div class="camera-modal-content">
       <div class="camera-header">
         <h3 id="modalHeaderTitle"><i class="ri-add-circle-line"></i> Thêm giao dịch & Khoảnh khắc</h3>
-        <button class="close-btn" id="closeCamBtn" title="Thoát không nhập"><i class="ri-close-line"></i></button>
+        <button class="close-btn jelly-btn" id="closeCamBtn" title="Thoát không nhập"><i class="ri-close-line"></i></button>
       </div>
 
       <div class="camera-preview-box">
         <img id="photoPreview" class="photo-preview" style="display: none;" alt="Preview">
         <div class="camera-placeholder" id="cameraPlaceholder">
           <i class="ri-image-add-line"></i>
-          <p>Chụp ảnh bàn ăn hoặc hóa đơn mua sắm (Tùy chọn)</p>
+          <p>Tải ảnh món ăn / bill từ bộ sưu tập hoặc chụp mới (Tùy chọn)</p>
         </div>
         <div class="scan-overlay" id="scanOverlay" style="display: none;">
           <div class="scan-line"></div>
@@ -104,11 +118,16 @@
         </div>
       </div>
 
-      <div class="camera-actions">
-        <input type="file" id="imageInput" accept="image/*" capture="environment" style="display: none;">
-        <button class="btn-secondary" type="button" id="btnChooseImage">
-          <i class="ri-gallery-line"></i> Chọn / Chụp ảnh khoảnh khắc
-        </button>
+      <div class="camera-actions" style="display: flex; gap: 10px; width: 100%;">
+        <input type="file" id="imageCameraInput" accept="image/*" capture="environment" style="position: absolute; width: 0.1px; height: 0.1px; opacity: 0; pointer-events: none; z-index: -1;">
+        <input type="file" id="imageGalleryInput" accept="image/*" style="position: absolute; width: 0.1px; height: 0.1px; opacity: 0; pointer-events: none; z-index: -1;">
+        
+        <label for="imageCameraInput" class="btn-secondary jelly-btn" id="btnCapturePhoto" style="flex: 1; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; text-align: center; margin: 0; padding: 10px;">
+          <i class="ri-camera-fill"></i> Chụp ảnh
+        </label>
+        <label for="imageGalleryInput" class="btn-secondary jelly-btn" id="btnChooseImage" style="flex: 1; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; text-align: center; margin: 0; padding: 10px;">
+          <i class="ri-gallery-line"></i> Chọn từ Album / File
+        </label>
       </div>
 
       <form class="form" id="photoTxForm" style="margin-top: 16px;">
@@ -117,17 +136,17 @@
         <div class="seg">
           <label>
             <input type="radio" name="photoType" value="expense" checked>
-            <span>Khoản chi (-)</span>
+            <span>Chi (-)</span>
           </label>
           <label>
             <input type="radio" name="photoType" value="income">
-            <span>Khoản thu (+)</span>
+            <span>Thu nhập (+)</span>
           </label>
         </div>
 
         <div class="field">
           <label>Số tiền (VNĐ) <small style="color: var(--primary);" id="scanBadge"></small></label>
-          <input type="number" id="photoAmount" placeholder="Nhập số tiền (vd: 1795000)" required min="1000">
+          <input type="number" id="photoAmount" placeholder="Nhập số tiền (vd: 50000)" required min="1000">
         </div>
 
         <div class="field">
@@ -136,8 +155,8 @@
         </div>
 
         <div class="field">
-          <label>Ghi chú / Nguồn thu / Món ăn</label>
-          <input type="text" id="photoTitle" placeholder="Vd: Bill ăn lẩu, Tiền bún đậu..." required>
+          <label>Nội dung / Món ăn / Nguồn thu</label>
+          <input type="text" id="photoTitle" placeholder="Vd: Ăn trưa bún đậu, Lương tháng..." required>
         </div>
 
         <fieldset class="cats">
@@ -151,8 +170,8 @@
         </fieldset>
 
         <div style="display: flex; gap: 10px; margin-top: 12px;">
-          <button type="button" class="btn-secondary" style="flex: 1;" id="btnCancelCam">Hủy / Thoát</button>
-          <button type="submit" class="primary" style="flex: 2;">
+          <button type="button" class="btn-secondary jelly-btn" style="flex: 1;" id="btnCancelCam">Hủy</button>
+          <button type="submit" class="primary jelly-btn" style="flex: 2;">
             <i class="ri-check-double-line"></i> Xác Nhận Lưu
           </button>
         </div>
@@ -164,14 +183,14 @@
   <div class="camera-modal" id="budgetModal">
     <div class="camera-modal-content">
       <div class="camera-header">
-        <h3><i class="ri-money-dollar-circle-line"></i> Cài đặt ngân sách tháng</h3>
-        <button class="close-btn" id="closeBudgetBtn"><i class="ri-close-line"></i></button>
+        <h3><i class="ri-money-dollar-circle-line"></i> Đặt ngân sách tháng</h3>
+        <button class="close-btn jelly-btn" id="closeBudgetBtn"><i class="ri-close-line"></i></button>
       </div>
       <div class="field">
-        <label>Nhập số tiền ngân sách tháng này của bạn (VNĐ):</label>
+        <label>Nhập tổng số tiền ngân sách của bạn (VNĐ):</label>
         <input type="number" id="monthlyBudgetInput" placeholder="Ví dụ: 3000000">
       </div>
-      <button class="primary" style="margin-top: 16px;" id="btnSaveBudget"><i class="ri-save-line"></i> Lưu Ngân Sách</button>
+      <button class="primary jelly-btn" style="margin-top: 16px;" id="btnSaveBudget"><i class="ri-save-line"></i> Lưu Ngân Sách</button>
     </div>
   </div>
 
@@ -180,7 +199,7 @@
     <div class="camera-modal-content">
       <div class="camera-header">
         <h3 id="dayDetailTitle"><i class="ri-calendar-check-line"></i> Chi tiết ngày</h3>
-        <button class="close-btn" id="closeDayDetailBtn"><i class="ri-close-line"></i></button>
+        <button class="close-btn jelly-btn" id="closeDayDetailBtn"><i class="ri-close-line"></i></button>
       </div>
       <div id="dayDetailBody"></div>
     </div>
@@ -189,9 +208,9 @@
   <!-- Toast Thông Báo -->
   <div class="toast" id="toast">Đã lưu giao dịch vào máy!</div>
 
-  <!-- Hiệu Ứng Mưa Xu Rơi -->
+  <!-- Hiệu Ứng Mưa Xu Rơi & Tiền Bay -->
   <div class="fx-layer" id="fxLayer"></div>
 
-  <script type="module" src="./js/app.js"></script>
+  <script type="module" src="./js/app.js?v=7"></script>
 </body>
 </html>

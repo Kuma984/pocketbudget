@@ -1,5 +1,5 @@
 // Dashboard Module - Netlify Cute Cat Meme Edition (Thành viên B) tích hợp với Đồng bộ & IndexedDB (Thành viên A)
-import { listRecords, saveAndQueue, openDatabase } from '../db.js';
+import { listRecords, saveAndQueue } from '../db.js';
 import { calculateWalletBalances, calculateTotalBalance, formatVND } from '../domain/finance.js';
 import { apiRequest } from '../api.js';
 
@@ -8,7 +8,6 @@ let currentViewYear = new Date().getFullYear();
 let currentViewMonth = new Date().getMonth(); // 0-11
 
 export async function render(container) {
-  // Lấy user đăng nhập nếu có
   let currentUser = null;
   try {
     const res = await apiRequest('auth.php?action=me');
@@ -19,13 +18,28 @@ export async function render(container) {
   const userId = currentUser ? currentUser.id : '1';
 
   container.innerHTML = `
-    <!-- Thẻ Ngân Sách & Số Dư (Hero) -->
-    <section class="hero">
+    <!-- THẺ NGÂN SÁCH CHÍNH (SỐ BỰ ĐÙNG VỚI THANH TIẾN ĐỘ) -->
+    <section class="hero" id="heroCard">
       <div class="hero-header">
-        <p class="hero-label">Ngân sách tháng này (Tùy chỉnh)</p>
-        <span class="badge-remaining">Còn lại: <b id="totalRemaining">0đ</b></span>
+        <p class="hero-label">Ngân sách còn lại trong tháng</p>
+        <span class="badge-remaining">Ban đầu: <b id="totalBudgetInitial">3.000.000 ₫</b></span>
       </div>
-      <div class="hero-amount" id="totalBalance">0 đ</div>
+      
+      <div class="hero-amount-row">
+        <div class="hero-amount" id="totalBalance">0 ₫</div>
+      </div>
+
+      <!-- Thanh Ngân Sách Đã Dùng % Màu Vàng -->
+      <div class="budget-progress-box">
+        <div class="budget-progress-info">
+          <span>Đã dùng: <b id="budgetPercentText">0%</b> ngân sách</span>
+          <span id="budgetUsedAmountText">0đ</span>
+        </div>
+        <div class="budget-progress-track">
+          <div class="budget-progress-bar" id="budgetProgressBar" style="width: 0%;"></div>
+        </div>
+      </div>
+
       <p class="hero-sub">Mỗi ngày được tiêu: <span id="dailyBudget" style="font-weight:700; color:var(--primary);">0đ</span></p>
       <div class="hero-chips">
         <span class="chip pos"><i class="ri-arrow-down-line"></i> Thu: <b id="totalIncome">0đ</b></span>
@@ -35,15 +49,15 @@ export async function render(container) {
 
     <!-- Thanh chọn Ví -->
     <div class="wallet-bar" id="walletBar">
-      <button class="wallet-chip active" data-wallet="all"><i class="ri-grid-fill"></i> Tất cả ví</button>
+      <button class="wallet-chip jelly-btn active" data-wallet="all"><i class="ri-grid-fill"></i> Tất cả ví</button>
     </div>
 
     <!-- Lịch Nhật Ký Khoảnh Khắc -->
     <section class="card locket-section-card">
       <div class="locket-header">
-        <button class="locket-nav-btn" id="locketPrevMonth"><i class="ri-arrow-left-s-line"></i></button>
+        <button class="locket-nav-btn jelly-btn" id="locketPrevMonth"><i class="ri-arrow-left-s-line"></i></button>
         <h2 id="locketMonthTitle" style="margin:0;">Tháng</h2>
-        <button class="locket-nav-btn" id="locketNextMonth"><i class="ri-arrow-right-s-line"></i></button>
+        <button class="locket-nav-btn jelly-btn" id="locketNextMonth"><i class="ri-arrow-right-s-line"></i></button>
       </div>
       <p class="section-desc" style="text-align: center; margin-top: 4px;">Lướt xem nhật ký khoảnh khắc & chi tiêu các tháng 📸</p>
       
@@ -105,11 +119,9 @@ export async function render(container) {
   await loadAndRenderDashboard();
 
   async function loadAndRenderDashboard() {
-    // Đọc danh sách ví và giao dịch
     let wallets = await listRecords('wallets', userId);
     let rawTxs = await listRecords('transactions', userId);
 
-    // Đảm bảo có ít nhất các ví mặc định nếu chưa có ví nào
     if (wallets.length === 0) {
       wallets = [
         { id: 'wallet_cash', user_id: String(userId), name: 'Ví tiền mặt', initial_balance_vnd: 0 },
@@ -118,7 +130,6 @@ export async function render(container) {
       ];
     }
 
-    // Chuẩn hóa dữ liệu tương thích giữa Thành viên A và Thành viên B
     const allTxs = rawTxs.map(t => {
       const amount = Number(t.amount_vnd != null ? t.amount_vnd : (t.amount || 0));
       const date = t.date || (t.occurred_on ? `${t.occurred_on}T12:00:00` : new Date().toISOString());
@@ -136,43 +147,44 @@ export async function render(container) {
       };
     }).sort((a, b) => new Date(b.date) - new Date(a.date));
 
-    // Lọc theo ví được chọn
     const filteredTxs = activeWalletFilter === 'all'
       ? allTxs
       : allTxs.filter(t => t.wallet === activeWalletFilter || t.wallet_id === activeWalletFilter);
 
-    // Tính toán số dư tổng tài sản theo chuẩn tài chính Member A
-    const walletBalances = calculateWalletBalances(wallets, allTxs);
-    let totalBalance = 0;
-    Object.values(walletBalances).forEach(b => { totalBalance += b; });
-
-    // Đọc ngân sách tháng
+    // Tính toán số dư
     const monthlyBudget = Number(localStorage.getItem('user_monthly_budget')) || 3000000;
 
-    let income = 0;
-    let expense = 0;
+    let totalIncome = 0;
+    let totalExpense = 0;
     let todayExp = 0;
     const todayStr = new Date().toDateString();
 
     filteredTxs.forEach(t => {
       const amt = t.amount;
       if (t.type === 'income') {
-        income += amt;
+        totalIncome += amt;
       } else if (t.type === 'expense') {
-        expense += amt;
+        totalExpense += amt;
         if (new Date(t.date).toDateString() === todayStr) {
           todayExp += amt;
         }
       }
     });
 
-    const remainingBudget = monthlyBudget - expense;
+    // Ngân sách còn lại trong tháng = Ngân sách gốc + Thu nhập - Chi tiêu
+    const currentRemaining = monthlyBudget + totalIncome - totalExpense;
 
-    // Render thông tin trên Hero
-    container.querySelector('#totalBalance').textContent = formatVND(totalBalance);
-    container.querySelector('#totalRemaining').textContent = formatVND(remainingBudget);
-    container.querySelector('#totalIncome').textContent = formatVND(income);
-    container.querySelector('#totalExpenseChip').textContent = formatVND(expense);
+    // Hiệu ứng nhảy số mượt mà
+    animateCountUp(currentRemaining, 'totalBalance');
+    container.querySelector('#totalBudgetInitial').textContent = formatVND(monthlyBudget);
+    container.querySelector('#totalIncome').textContent = formatVND(totalIncome);
+    container.querySelector('#totalExpenseChip').textContent = formatVND(totalExpense);
+
+    // Tính % ngân sách đã dùng
+    const usedPercent = Math.min(100, Math.max(0, Math.round((totalExpense / (monthlyBudget + totalIncome)) * 100))) || 0;
+    container.querySelector('#budgetPercentText').textContent = `${usedPercent}%`;
+    container.querySelector('#budgetUsedAmountText').textContent = `${formatVND(totalExpense)} / ${formatVND(monthlyBudget + totalIncome)}`;
+    container.querySelector('#budgetProgressBar').style.width = `${usedPercent}%`;
 
     // Cập nhật trạng thái hôm nay trên topbar
     const todayStatusEl = document.getElementById('todayExpenseStatus');
@@ -186,18 +198,16 @@ export async function render(container) {
       }
     }
 
-    // Tính toán ngân sách mỗi ngày
+    // Tính ngân sách mỗi ngày
     const now = new Date();
     const daysInMonth = new Date(currentViewYear, currentViewMonth + 1, 0).getDate();
     const remainingDays = Math.max(1, daysInMonth - now.getDate() + 1);
-    const dailyBudget = Math.max(0, Math.round(remainingBudget / remainingDays));
+    const dailyBudget = Math.max(0, Math.round(currentRemaining / remainingDays));
     container.querySelector('#dailyBudget').textContent = `${formatVND(dailyBudget)}/ngày (${remainingDays} ngày còn lại)`;
 
-    // Tiêu đề tháng
     const monthNames = ['Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5', 'Tháng 6', 'Tháng 7', 'Tháng 8', 'Tháng 9', 'Tháng 10', 'Tháng 11', 'Tháng 12'];
     container.querySelector('#locketMonthTitle').textContent = `${monthNames[currentViewMonth]} ${currentViewYear}`;
 
-    // Render các khối con
     renderWalletBar(wallets);
     renderCalendarGrid(filteredTxs);
     renderWeeklyChart(filteredTxs);
@@ -205,14 +215,36 @@ export async function render(container) {
     renderTxList(filteredTxs, userId);
   }
 
+  function animateCountUp(targetVal, elementId) {
+    const el = document.getElementById(elementId);
+    if (!el) return;
+    const startVal = 0;
+    const duration = 750;
+    const startTime = performance.now();
+
+    function updateCount(currentTime) {
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const easeProgress = 1 - (1 - progress) * (1 - progress);
+      const currentVal = Math.round(startVal + (targetVal - startVal) * easeProgress);
+
+      el.textContent = formatVND(currentVal);
+
+      if (progress < 1) {
+        requestAnimationFrame(updateCount);
+      }
+    }
+
+    requestAnimationFrame(updateCount);
+  }
+
   function renderWalletBar(wallets) {
     const bar = container.querySelector('#walletBar');
-    bar.innerHTML = `<button class="wallet-chip ${activeWalletFilter === 'all' ? 'active' : ''}" data-wallet="all"><i class="ri-grid-fill"></i> Tất cả ví</button>`;
+    bar.innerHTML = `<button class="wallet-chip jelly-btn ${activeWalletFilter === 'all' ? 'active' : ''}" data-wallet="all"><i class="ri-grid-fill"></i> Tất cả ví</button>`;
 
-    // Thêm các chip ví từ danh sách ví
     wallets.forEach(w => {
       const btn = document.createElement('button');
-      btn.className = `wallet-chip ${activeWalletFilter === w.name || activeWalletFilter === w.id ? 'active' : ''}`;
+      btn.className = `wallet-chip jelly-btn ${activeWalletFilter === w.name || activeWalletFilter === w.id ? 'active' : ''}`;
       btn.setAttribute('data-wallet', w.name);
       
       let icon = 'ri-wallet-3-line';
@@ -299,7 +331,7 @@ export async function render(container) {
 
     body.innerHTML = `
       <div style="margin-bottom: 16px;">
-        <button class="primary" id="btnAddForThisDate">
+        <button class="primary jelly-btn" id="btnAddForThisDate">
           <i class="ri-camera-fill"></i> Thêm ảnh & chi tiêu cho ngày này
         </button>
       </div>
@@ -443,11 +475,10 @@ export async function render(container) {
         <div class="tx-amt ${t.type === 'income' ? 'pos' : 'neg'}">
           ${t.type === 'income' ? '+' : '-'}${formatVND(t.amount)}
         </div>
-        <button class="tx-del-btn" data-id="${t.id}" title="Xóa khoản này"><i class="ri-delete-bin-line"></i></button>
+        <button class="tx-del-btn jelly-btn" data-id="${t.id}" title="Xóa khoản này"><i class="ri-delete-bin-line"></i></button>
       </li>
     `).join('');
 
-    // Bắt sự kiện xóa giao dịch
     listEl.querySelectorAll('.tx-del-btn').forEach(btn => {
       btn.onclick = async (e) => {
         const id = e.currentTarget.getAttribute('data-id');
