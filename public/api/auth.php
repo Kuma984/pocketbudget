@@ -7,6 +7,9 @@ $pdo = get_db();
 start_session();
 
 $action = $_GET['action'] ?? '';
+if ($action === 'ping') {
+    json_response(['ok' => true, 'timestamp' => time()]);
+}
 $input = get_json_input();
 if (in_array($action, ['register', 'login', 'logout'], true) && ($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
     json_response(['ok' => false, 'error' => ['message' => 'Thao tác này yêu cầu POST.']], 405);

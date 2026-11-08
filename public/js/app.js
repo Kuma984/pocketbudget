@@ -286,21 +286,74 @@ function route() {
 
 window.addEventListener('hashchange', route);
 
-function updateNetworkStatus() {
+let previousOnlineStatus = null;
+
+async function updateNetworkStatus() {
   const netEl = document.getElementById('network');
   if (!netEl) return;
-  if (navigator.onLine) {
+
+  let isOnline = navigator.onLine;
+
+  if (isOnline) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2000);
+      const res = await fetch('./api/auth.php?action=ping', {
+        method: 'GET',
+        signal: controller.signal,
+        cache: 'no-store'
+      });
+      clearTimeout(timeoutId);
+      isOnline = res.ok;
+    } catch {
+      // If server unreachable or network dead
+      isOnline = false;
+    }
+  }
+
+  // Clear any inline style overrides so CSS data-state rules take full effect
+  netEl.style.background = '';
+  netEl.style.color = '';
+  netEl.style.borderColor = '';
+
+  if (isOnline) {
     netEl.setAttribute('data-state', 'online');
     netEl.innerHTML = '<i class="ri-wifi-line"></i> Online';
+    if (previousOnlineStatus === false) {
+      showToast('🟢 Đã kết nối lại mạng (Online)');
+      if (currentUser) {
+        try {
+          await pushOutbox();
+          await pullSnapshot(currentUser.id);
+        } catch {}
+      }
+    }
   } else {
     netEl.setAttribute('data-state', 'offline');
     netEl.innerHTML = '<i class="ri-wifi-off-line"></i> Offline';
-    netEl.style.background = 'var(--danger-light)';
-    netEl.style.color = 'var(--danger)';
+    if (previousOnlineStatus === true) {
+      showToast('🔴 Đang ở chế độ Ngoại tuyến (Offline)');
+    }
   }
+  previousOnlineStatus = isOnline;
 }
-window.addEventListener('online', updateNetworkStatus);
-window.addEventListener('offline', updateNetworkStatus);
+
+window.addEventListener('online', () => updateNetworkStatus());
+window.addEventListener('offline', () => {
+  const netEl = document.getElementById('network');
+  if (netEl) {
+    netEl.style.background = '';
+    netEl.style.color = '';
+    netEl.style.borderColor = '';
+    netEl.setAttribute('data-state', 'offline');
+    netEl.innerHTML = '<i class="ri-wifi-off-line"></i> Offline';
+    if (previousOnlineStatus === true) {
+      showToast('🔴 Đang ở chế độ Ngoại tuyến (Offline)');
+    }
+    previousOnlineStatus = false;
+  }
+});
+setInterval(updateNetworkStatus, 3500);
 updateNetworkStatus();
 
 // ==========================================
