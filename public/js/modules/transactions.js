@@ -7,6 +7,20 @@ import { apiRequest } from '../api.js';
 let currentUser = null;
 let editingId = null;
 
+const categoryLabels = {
+  allowance: '💵 Trợ cấp',
+  salary: '💰 Lương',
+  scholarship: '🎓 Học bổng',
+  other_income: '✨ Thu nhập khác',
+  food: '🍜 Ăn uống',
+  transport: '🛵 Đi lại',
+  study: '📚 Học tập',
+  shopping: '🛍️ Mua sắm',
+  entertainment: '🎮 Giải trí',
+  health: '💊 Sức khỏe',
+  other_expense: '📦 Chi phí khác'
+};
+
 export async function render(container) {
   container.innerHTML = `
     <!-- Khung tài khoản & trạng thái -->
@@ -242,7 +256,9 @@ export async function render(container) {
 
       const cats = type === 'expense' ? CATEGORIES.expense : CATEGORIES.income;
       cats.forEach(c => {
-        catSelect.innerHTML += `<option value="${c.code}">${c.name}</option>`;
+        const code = typeof c === 'object' ? c.code : c;
+        const name = typeof c === 'object' ? c.name : (categoryLabels[code] || code);
+        catSelect.innerHTML += `<option value="${code}">${name}</option>`;
       });
     }
   }
@@ -291,7 +307,9 @@ export async function render(container) {
       tr.innerHTML = `
         <td>${t.occurred_on}</td>
         <td>${typeBadge}</td>
-        <td>${t.type === 'transfer' ? `${escapeHtml(wName)} ➔ ${escapeHtml(destWName)}` : escapeHtml(wName)}</td>
+        <td>${t.type === 'transfer'
+          ? `${escapeHtml(wName)} ➔ ${escapeHtml(destWName)}`
+          : `${escapeHtml(wName)}${t.category_code ? `<br><small style="color:var(--muted);">${categoryLabels[t.category_code] || t.category_code}</small>` : ''}`}</td>
         <td>${escapeHtml(t.note)}</td>
         <td style="text-align:right; font-weight:700; color:${amtColor};">${sign}${formatVND(t.amount_vnd)}</td>
         <td style="text-align:center;">${syncStatus}</td>
