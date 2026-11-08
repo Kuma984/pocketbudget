@@ -39,7 +39,7 @@ export async function render(container) {
       ${currentUser ? `
         <div style="background:var(--primary-light); border:1px solid rgba(16,185,129,0.3); padding:16px; border-radius:var(--radius-sm); margin-bottom:16px;">
           <p style="margin:0 0 6px 0;">Đang đăng nhập với tư cách: <strong style="color:var(--primary);">${escapeHtml(currentUser.name)}</strong></p>
-          <small style="color:var(--muted); display:block; margin-bottom:12px;">Email: ${escapeHtml(currentUser.email)} • Mã sinh viên ID: #${currentUser.id}</small>
+          <small style="color:var(--muted); display:block; margin-bottom:12px;">Email: ${escapeHtml(currentUser.email)}</small>
           <button type="button" class="btn-secondary" id="btnLogout" style="max-width:180px;"><i class="ri-logout-box-r-line"></i> Đăng xuất</button>
         </div>
       ` : `
