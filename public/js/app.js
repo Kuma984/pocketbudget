@@ -1,3 +1,4 @@
+import { t, getLang, toggleLanguage, updateStaticDOM } from './i18n.js';
 // App.js - Điểm điều phối ứng dụng PocketBudget (Cute Cat Meme Edition)
 // Tích hợp toàn diện Thành viên A (Core & Backend), Thành viên B (PWA & Dashboard), Thành viên C (Simulation & AI)
 import { render as dashboard } from './modules/dashboard.js';
@@ -24,6 +25,7 @@ const routes = { dashboard, transactions, budget, simulation, wishlist, chat, sy
 // ==========================================
 document.addEventListener('DOMContentLoaded', async () => {
   createFallingCoinsAndWallets();
+  updateStaticDOM();
   await fetchCurrentUser();
   await ensureDefaultWallets(currentUser ? currentUser.id : '1');
 
@@ -203,7 +205,7 @@ function checkOnboarding() {
   if (currentUser && currentUser.name) {
     if (!localName) localStorage.setItem('student_name', currentUser.name);
     if (modal) modal.style.display = 'none';
-    document.getElementById('userHeaderName').textContent = `Chào ${currentUser.name} 👋`;
+    document.getElementById('userHeaderName').textContent = t('hello_user', { name: currentUser.name });
     return;
   }
 
@@ -211,7 +213,7 @@ function checkOnboarding() {
     if (modal) modal.style.display = 'flex';
   } else {
     if (modal) modal.style.display = 'none';
-    document.getElementById('userHeaderName').textContent = `Chào ${localName} 👋`;
+    document.getElementById('userHeaderName').textContent = t('hello_user', { name: localName });
   }
 }
 
@@ -252,7 +254,7 @@ async function updateTopBarInfo() {
         todayStatusEl.textContent = `Đã chi ${new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(todayExp)}`;
         todayStatusEl.style.color = 'var(--danger)';
       } else {
-        todayStatusEl.textContent = 'Chưa chi tiêu';
+        todayStatusEl.textContent = t('no_expense_today');
         todayStatusEl.style.color = 'var(--primary)';
       }
     }
@@ -766,6 +768,15 @@ function setupEventListeners() {
   if (btnCloseDayDetail) {
     btnCloseDayDetail.onclick = () => {
       document.getElementById('dayDetailModal').classList.remove('show');
+    };
+  }
+
+    const btnLangToggle = document.getElementById('btnLangToggle');
+  if (btnLangToggle) {
+    btnLangToggle.onclick = () => {
+      const nextLang = toggleLanguage();
+      showToast(nextLang === 'en' ? 'Switched to English 🇬🇧' : 'Đã đổi sang Tiếng Việt 🇻🇳');
+      route();
     };
   }
 

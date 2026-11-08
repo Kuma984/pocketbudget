@@ -1,3 +1,4 @@
+import { t } from '../i18n.js';
 // Dashboard Module - Netlify Cute Cat Meme Edition (Thành viên B) tích hợp với Đồng bộ & IndexedDB (Thành viên A)
 import { listRecords, saveAndQueue } from '../db.js';
 import { calculateWalletBalances, calculateTotalBalance, dailyAllowance, daysLeftInMonth, formatVND, getMonthBudgetStatus, getMonthTotals } from '../domain/finance.js';
@@ -57,7 +58,7 @@ export async function render(container) {
 
     <!-- Thanh chọn Ví -->
     <div class="wallet-bar" id="walletBar">
-      <button class="wallet-chip jelly-btn active" data-wallet="all"><i class="ri-grid-fill"></i> Tất cả ví</button>
+      <button class="wallet-chip jelly-btn active" data-wallet="all"><i class="ri-grid-fill"></i> ${t("all_wallets_tab")}</button>
     </div>
 
     <!-- Lịch Nhật Ký Khoảnh Khắc -->
@@ -67,7 +68,7 @@ export async function render(container) {
         <h2 id="locketMonthTitle" style="margin:0;">Tháng</h2>
         <button class="locket-nav-btn jelly-btn" id="locketNextMonth"><i class="ri-arrow-right-s-line"></i></button>
       </div>
-      <p class="section-desc" style="text-align: center; margin-top: 4px;">Lướt xem nhật ký khoảnh khắc & chi tiêu các tháng 📸</p>
+      <p class="section-desc" style="text-align: center; margin-top: 4px;">${t("calendar_title")}</p>
       
       <div class="calendar-grid-header">
         <span>T2</span><span>T3</span><span>T4</span><span>T5</span><span>T6</span><span>T7</span><span>CN</span>
@@ -78,12 +79,12 @@ export async function render(container) {
     <!-- Biểu Đồ Thống Kê & Biểu Đồ Tròn Đa Màu Sắc -->
     <div class="grid-2">
       <section class="card">
-        <h2><i class="ri-bar-chart-line"></i> Chi tiêu 7 ngày qua</h2>
+        <h2><i class="ri-bar-chart-line"></i> ${t("weekly_chart_title")}</h2>
         <div class="week" id="weeklyChart"></div>
       </section>
 
       <section class="card">
-        <h2><i class="ri-pie-chart-2-line"></i> Phân tích biểu đồ tròn</h2>
+        <h2><i class="ri-pie-chart-2-line"></i> ${t("donut_chart_title")}</h2>
         <div class="pie-chart-container">
           <div class="donut-svg-wrap">
             <svg viewBox="0 0 36 36" class="donut-chart" id="donutSvg"></svg>
@@ -96,7 +97,7 @@ export async function render(container) {
     <!-- Danh Sách Lịch Sử Giao Dịch -->
     <section class="card">
       <div class="card-header-row">
-        <h2><i class="ri-history-line"></i> Lịch sử giao dịch</h2>
+        <h2><i class="ri-history-line"></i> ${t("recent_transactions")}</h2>
         <small id="txCount" class="muted-tag">0 khoản</small>
       </div>
       <ul class="tx-list" id="txList">
@@ -228,7 +229,7 @@ export async function render(container) {
     const walletLabelEl = container.querySelector('#walletBalanceLabel');
     const walletValueEl = container.querySelector('#walletBalanceValue');
     if (activeWalletFilter === 'all') {
-      walletLabelEl.textContent = `Số dư hiện tại (tất cả ${wallets.length} ví)`;
+      walletLabelEl.textContent = t('hero_all_wallets', { count: wallets.length });
       walletValueEl.textContent = formatVND(calculateTotalBalance(wallets, rawTxs));
     } else {
       const id = activeWalletId(wallets);
@@ -299,7 +300,7 @@ export async function render(container) {
 
   function renderWalletBar(wallets) {
     const bar = container.querySelector('#walletBar');
-    bar.innerHTML = `<button class="wallet-chip jelly-btn ${activeWalletFilter === 'all' ? 'active' : ''}" data-wallet="all"><i class="ri-grid-fill"></i> Tất cả ví</button>`;
+    bar.innerHTML = `<button class="wallet-chip jelly-btn ${activeWalletFilter === 'all' ? 'active' : ''}" data-wallet="all"><i class="ri-grid-fill"></i> ${t("all_wallets_tab")}</button>`;
 
     const seenBarNames = new Set();
     wallets.forEach(w => {

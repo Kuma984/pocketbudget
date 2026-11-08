@@ -1,3 +1,4 @@
+import { t } from '../i18n.js';
 ﻿// Thành viên A — Task A03: Màn hình Thu chi & Ví (Giao diện chuẩn Netlify Cute Theme)
 import { CATEGORIES } from '../config.js';
 import { listRecords, saveAndQueue, generateClientUuid, openDatabase } from '../db.js';
@@ -30,13 +31,13 @@ export async function render(container) {
     <!-- Khung tổng quan số dư các ví -->
     <section class="card" style="margin-bottom: 20px;">
       <div class="card-header-row">
-        <h2><i class="ri-wallet-3-line"></i> Quản lý các Ví & Tổng tài sản</h2>
+        <h2><i class="ri-wallet-3-line"></i> ${t("wallet_mgmt_title")}</h2>
       </div>
       
       <div style="margin: 12px 0 16px;">
-        <span style="font-size:0.85rem; color:var(--muted);">Tổng tài sản ròng:</span>
+        <span style="font-size:0.85rem; color:var(--muted);">${t("total_net_worth")}</span>
         <div id="total-balance" style="font-size: 2.2rem; font-weight: 800; color: var(--primary);">0 đ</div>
-        <small style="color:var(--muted); font-size:0.8rem;">* Thao tác Chuyển tiền giữa 2 ví không làm thay đổi tổng tài sản.</small>
+        <small style="color:var(--muted); font-size:0.8rem;">${t("transfer_note")}</small>
       </div>
 
       <!-- Danh sách các ví -->
@@ -44,12 +45,12 @@ export async function render(container) {
 
       <!-- Form thêm ví mới -->
       <div style="background:var(--bg); border:1px solid var(--line-strong); padding:14px; border-radius:var(--radius-sm);">
-        <h4 style="margin:0 0 10px 0; font-size:0.92rem;"><i class="ri-add-line"></i> Tạo thêm ví mới</h4>
+        <h4 style="margin:0 0 10px 0; font-size:0.92rem;"><i class="ri-add-line"></i> ${t("create_wallet_title")}</h4>
         <div style="display:flex; gap:10px; flex-wrap:wrap;">
           <input type="text" id="new-wallet-name" placeholder="Tên ví (vd: Tiền mặt, Techcombank, MoMo)" style="flex:2; min-width:180px;">
           <input type="number" id="new-wallet-balance" placeholder="Số dư ban đầu" value="0" style="flex:1; min-width:130px;">
           <button type="button" id="btn-create-wallet" class="primary" style="flex:1; min-width:120px; padding:10px;">
-            <i class="ri-add-circle-line"></i> Thêm ví
+            <i class="ri-add-circle-line"></i> ${t("btn_add_wallet")}
           </button>
         </div>
       </div>
@@ -65,9 +66,9 @@ export async function render(container) {
           <div class="field">
             <label>Loại giao dịch</label>
             <select id="tx-type" class="select-field">
-              <option value="expense">Khoản chi (-)</option>
-              <option value="income">Khoản thu (+)</option>
-              <option value="transfer">Chuyển ví (⇄)</option>
+              <option value="expense">${t("tab_expense")}</option>
+              <option value="income">${t("tab_income")}</option>
+              <option value="transfer">${t("tab_transfer")}</option>
             </select>
           </div>
 
@@ -79,7 +80,7 @@ export async function render(container) {
 
         <div class="grid-2">
           <div class="field" id="box-dest-wallet" style="display:none;">
-            <label>Ví nhận tiền</label>
+            <label>${t("target_wallet_label")}</label>
             <select id="tx-dest-wallet" class="select-field"></select>
           </div>
 
@@ -91,7 +92,7 @@ export async function render(container) {
 
         <div class="grid-2">
           <div class="field">
-            <label>Số tiền (VNĐ)</label>
+            <label>${t("amount_label")}</label>
             <input type="number" id="tx-amount" placeholder="Nhập số tiền" required min="1000" step="1000">
           </div>
 
@@ -515,7 +516,7 @@ export async function render(container) {
     const note = document.getElementById('tx-note').value.trim();
 
     if (type === 'transfer' && walletId === destWalletId) {
-      alert('Ví nhận tiền phải khác ví chuyển.');
+      alert('${t("target_wallet_label")} phải khác ví chuyển.');
       return;
     }
 
