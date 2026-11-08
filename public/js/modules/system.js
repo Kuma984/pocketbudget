@@ -49,8 +49,8 @@ export async function render(container) {
             <h3 style="margin-top:0; font-size:1rem;"><i class="ri-login-box-line"></i> Đăng nhập</h3>
             <form id="formLogin" class="form">
               <div class="field">
-                <label>Email sinh viên</label>
-                <input type="email" id="loginEmail" placeholder="demo@pocketbudget.local" required value="demo@pocketbudget.local">
+                <label>Email đăng nhập</label>
+                <input type="email" id="loginEmail" placeholder="nguyenvana@gmail.com" required value="demo@pocketbudget.local">
               </div>
               <div class="field">
                 <label>Mật khẩu</label>
@@ -70,7 +70,7 @@ export async function render(container) {
               </div>
               <div class="field">
                 <label>Email</label>
-                <input type="email" id="regEmail" placeholder="student@tdtu.edu.vn" required>
+                <input type="email" id="regEmail" placeholder="nguyenvana@gmail.com" required>
               </div>
               <div class="field">
                 <label>Mật khẩu</label>
