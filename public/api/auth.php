@@ -6,6 +6,69 @@ require_once __DIR__ . '/../../server/bootstrap.php';
 $pdo = get_db();
 start_session();
 
+function is_legit_email(string $email, ?string &$errorMsg = null): bool {
+    $email = trim(strtolower($email));
+    
+    // 1. Kiểm tra cú pháp cơ bản
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $errorMsg = 'Định dạng email không đúng chuẩn (ví dụ: yourname@gmail.com).';
+        return false;
+    }
+    
+    $parts = explode('@', $email);
+    if (count($parts) !== 2) {
+        $errorMsg = 'Địa chỉ email không hợp lệ.';
+        return false;
+    }
+    
+    [$user, $domain] = $parts;
+    
+    // 2. Chặn các nhà cung cấp email ảo / rác tạm thời (Disposable emails)
+    $disposableDomains = [
+        'tempmail.com', '10minutemail.com', 'mailinator.com', 'guerrillamail.com',
+        'trashmail.com', 'yopmail.com', 'dispostable.com', 'sharklasers.com',
+        'fakeinbox.com', 'getairmail.com', 'throwawaymail.com', 'burnermail.io'
+    ];
+    if (in_array($domain, $disposableDomains, true)) {
+        $errorMsg = 'Vui lòng không sử dụng email ảo/tạm thời để đăng ký tài khoản.';
+        return false;
+    }
+    
+    // 3. Kiểm tra chuyên sâu chuẩn Google đối với Gmail
+    if ($domain === 'gmail.com' || $domain === 'googlemail.com') {
+        $cleanUser = str_replace('.', '', $user);
+        if (strlen($cleanUser) < 6 || strlen($cleanUser) > 30) {
+            $errorMsg = 'Tài khoản Gmail phải có tên người dùng từ 6 đến 30 ký tự.';
+            return false;
+        }
+        
+        if (!preg_match('/^[a-z0-9.]+$/', $user)) {
+            $errorMsg = 'Tài khoản Gmail chỉ được chứa chữ cái (a-z), chữ số (0-9) và dấu chấm.';
+            return false;
+        }
+        
+        if (strpos($user, '..') !== false || str_starts_with($user, '.') || str_ends_with($user, '.')) {
+            $errorMsg = 'Tài khoản Gmail không được chứa dấu chấm liên tiếp hoặc ở đầu/cuối tên người dùng.';
+            return false;
+        }
+    }
+    
+    // 4. Kiểm tra DNS Domain nếu là domain thực tế (bỏ qua tên miền local)
+    if (!str_ends_with($domain, '.local') && $domain !== 'localhost') {
+        if (function_exists('checkdnsrr')) {
+            $hasMx = @checkdnsrr($domain, 'MX');
+            $hasA = @checkdnsrr($domain, 'A');
+            if (!$hasMx && !$hasA) {
+                $errorMsg = 'Tên miền email "' . htmlspecialchars($domain) . '" không tồn tại hoặc không thể nhận thư.';
+                return false;
+            }
+        }
+    }
+    
+    return true;
+}
+
+
 $action = $_GET['action'] ?? '';
 if ($action === 'ping') {
     json_response(['ok' => true, 'timestamp' => time()]);
@@ -28,6 +91,15 @@ if ($action === 'register') {
 
     if ($name === '' || $email === '' || $password === '') {
         json_response(['ok' => false, 'error' => ['message' => 'Vui lòng điền đầy đủ họ tên, email và mật khẩu.']], 400);
+    }
+
+    $emailError = null;
+    if (!is_legit_email($email, $emailError)) {
+        json_response(['ok' => false, 'error' => ['message' => $emailError]], 400);
+    }
+
+    if (strlen($password) < 6) {
+        json_response(['ok' => false, 'error' => ['message' => 'Mật khẩu phải có độ dài tối thiểu 6 ký tự.']], 400);
     }
 
     // Kiểm tra xem email đã tồn tại chưa
@@ -118,7 +190,8 @@ if ($action === 'me') {
 // 4. ĐĂNG XUẤT (LOGOUT)
 if ($action === 'logout') {
     start_session();
-    $_SESSION = [];
+
+$_SESSION = [];
     if (session_id() !== '') {
         session_destroy();
     }

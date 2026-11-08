@@ -1,3 +1,40 @@
+
+export function validateLegitEmail(email) {
+  email = (email || '').trim().toLowerCase();
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { ok: false, message: 'Định dạng email không hợp lệ (ví dụ: yourname@gmail.com).' };
+  }
+  const parts = email.split('@');
+  if (parts.length !== 2) return { ok: false, message: 'Địa chỉ email không hợp lệ.' };
+  const [user, domain] = parts;
+
+  // Chặn email rác / ảo tạm thời
+  const disposable = [
+    'tempmail.com', '10minutemail.com', 'mailinator.com', 'guerrillamail.com',
+    'trashmail.com', 'yopmail.com', 'dispostable.com', 'sharklasers.com',
+    'fakeinbox.com', 'getairmail.com', 'throwawaymail.com', 'burnermail.io'
+  ];
+  if (disposable.includes(domain)) {
+    return { ok: false, message: 'Vui lòng không sử dụng email rác/tạm thời để đăng ký tài khoản.' };
+  }
+
+  // Quy tắc kiểm tra tính hợp lệ của tài khoản Gmail (Google standard)
+  if (domain === 'gmail.com' || domain === 'googlemail.com') {
+    const cleanUser = user.replace(/\./g, '');
+    if (cleanUser.length < 6 || cleanUser.length > 30) {
+      return { ok: false, message: 'Tên người dùng Gmail phải có độ dài từ 6 đến 30 ký tự.' };
+    }
+    if (!/^[a-z0-9.]+$/.test(user)) {
+      return { ok: false, message: 'Tên tài khoản Gmail chỉ được chứa chữ cái (a-z), chữ số (0-9) và dấu chấm (không chứa ký tự đặc biệt).' };
+    }
+    if (user.includes('..') || user.startsWith('.') || user.endsWith('.')) {
+      return { ok: false, message: 'Tài khoản Gmail không hợp lệ: Không chứa dấu chấm liên tiếp hoặc ở đầu/cuối.' };
+    }
+  }
+
+  return { ok: true };
+}
+
 import { t } from '../i18n.js';
 // System & Backend Sync Module (Thành viên A)
 import { apiRequest } from '../api.js';
@@ -164,11 +201,47 @@ export async function render(container) {
   // Đăng ký
   const formRegister = container.querySelector('#formRegister');
   if (formRegister) {
+    const regEmailInput = container.querySelector('#regEmail');
+    const emailHint = document.createElement('small');
+    emailHint.style.display = 'block';
+    emailHint.style.marginTop = '4px';
+    emailHint.style.fontSize = '0.8rem';
+    regEmailInput.parentNode.appendChild(emailHint);
+
+    regEmailInput.oninput = () => {
+      const val = regEmailInput.value.trim();
+      if (!val) {
+        emailHint.textContent = '';
+        return;
+      }
+      const res = validateLegitEmail(val);
+      if (!res.ok) {
+        emailHint.style.color = '#ef4444';
+        emailHint.textContent = '⚠️ ' + res.message;
+      } else {
+        emailHint.style.color = '#10b981';
+        emailHint.textContent = '✓ Tài khoản email hợp lệ và sẵn sàng đăng ký.';
+      }
+    };
+
     formRegister.onsubmit = async (e) => {
       e.preventDefault();
       const name = container.querySelector('#regName').value.trim();
       const email = container.querySelector('#regEmail').value.trim();
       const password = container.querySelector('#regPassword').value;
+
+      const check = validateLegitEmail(email);
+      if (!check.ok) {
+        alert('⚠️ ' + check.message);
+        container.querySelector('#regEmail').focus();
+        return;
+      }
+
+      if (password.length < 6) {
+        alert('⚠️ Mật khẩu phải có độ dài ít nhất 6 ký tự.');
+        container.querySelector('#regPassword').focus();
+        return;
+      }
       try {
         const res = await apiRequest('auth.php?action=register', {
           method: 'POST',
