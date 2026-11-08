@@ -1,3 +1,4 @@
+import { t } from '../i18n.js';
 import { apiRequest } from '../api.js';
 import { isValidAmount } from '../domain/finance.js';
 import { currentAppUserId, getCSession, openSimulation, readCRecords } from './c-context.js';
@@ -30,18 +31,18 @@ export function render(container) {
   const state = chatState();
   const root = el('section', null, { class: 'card c-module' });
   container.replaceChildren(root);
-  root.append(el('h2', 'Trợ lý AI'),
-    el('p', 'Hỏi về số dư, thu chi, ngân sách, thử một khoản mua hoặc tạo bản nháp. Chatbot chạy local qua máy chủ của nhóm và không tự lưu giao dịch.', { class: 'section-desc' }),
+  root.append(el('h2', t('chat_header_title')),
+    el('p', t('chat_header_desc'), { class: 'section-desc' }),
     state.log);
 
   const form = el('form', null, { class: 'form c-chat-form' });
-  const message = field(form, 'Câu hỏi của bạn', 'chat-message', { tag: 'textarea', maxlength: '500', rows: '2', placeholder: 'Ví dụ: Tôi còn bao nhiêu tiền?', enterkeyhint: 'send' });
+  const message = field(form, t('chat_input_label'), 'chat-message', { tag: 'textarea', maxlength: '500', rows: '2', placeholder: t('chat_placeholder'), enterkeyhint: 'send' });
   message.value = state.draft;
   message.addEventListener('input', () => { state.draft = message.value; });
 
   const guide = el('details', null, { class: 'c-guide' });
   if (!state.log.childElementCount) guide.open = true;
-  guide.append(el('summary', 'Cách dùng chatbot'));
+  guide.append(el('summary', t('chat_guide_title')));
   const sampleList = el('ul', null, { class: 'c-guide-samples' });
   for (const [label, example] of EXAMPLES) {
     const button = el('button', null, { type: 'button', class: 'c-sample', title: 'Điền câu này vào ô chat' });
@@ -65,10 +66,10 @@ export function render(container) {
   }
 
   const actions = el('div', null, { class: 'c-actions' });
-  const submit = action('Gửi câu hỏi', 'submit');
+  const submit = action(t('chat_btn_send'), 'submit');
   const secondary = el('div', null, { class: 'c-actions-secondary' });
-  const reset = action('Cuộc trò chuyện mới');
-  const manual = action('Mở mô phỏng thủ công');
+  const reset = action(t('chat_btn_new'));
+  const manual = action(t('chat_btn_manual_sim'));
   reset.addEventListener('click', () => {
     if (busy) return;
     chat = newChat(currentAppUserId());
@@ -219,7 +220,7 @@ export function render(container) {
       const retryButton = action('Thử lại');
       retryButton.addEventListener('click', () => { retryButton.remove(); void ask(question, { retry: true }); });
       const row = el('div', null, { class: 'c-quick' });
-      const fallback = action('Mở mô phỏng thủ công');
+      const fallback = action(t('chat_btn_manual_sim'));
       fallback.addEventListener('click', () => openSimulation(null));
       row.append(retryButton, fallback);
       reply.append(row);

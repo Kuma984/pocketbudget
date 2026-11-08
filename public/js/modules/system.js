@@ -1,3 +1,4 @@
+import { t } from '../i18n.js';
 // System & Backend Sync Module (Thành viên A)
 import { apiRequest } from '../api.js';
 import { syncNow } from '../sync.js';
@@ -33,39 +34,39 @@ export async function render(container) {
 
   container.innerHTML = `
     <section class="card" style="margin-bottom: 20px;">
-      <h2><i class="ri-shield-user-line"></i> Xác thực Tài khoản</h2>
-      <p class="section-desc">Hệ thống hỗ trợ làm việc Ngoại tuyến (Offline-First) và Đăng nhập để đồng bộ đám mây.</p>
+      <h2><i class="ri-shield-user-line"></i> ${t('sys_auth_title')}</h2>
+      <p class="section-desc">${t('sys_auth_desc')}</p>
 
       ${currentUser ? `
         <div style="background:var(--primary-light); border:1px solid rgba(16,185,129,0.3); padding:16px; border-radius:var(--radius-sm); margin-bottom:16px;">
-          <p style="margin:0 0 6px 0;">Đang đăng nhập với tư cách: <strong style="color:var(--primary);">${escapeHtml(currentUser.name)}</strong></p>
+          <p style="margin:0 0 6px 0;">${t('sys_logged_in_as')} <strong style="color:var(--primary);">${escapeHtml(currentUser.name)}</strong></p>
           <small style="color:var(--muted); display:block; margin-bottom:12px;">Email: ${escapeHtml(currentUser.email)}</small>
-          <button type="button" class="btn-secondary" id="btnLogout" style="max-width:180px;"><i class="ri-logout-box-r-line"></i> Đăng xuất</button>
+          <button type="button" class="btn-secondary" id="btnLogout" style="max-width:180px;"><i class="ri-logout-box-r-line"></i> ${t('sys_btn_logout')}</button>
         </div>
       ` : `
         <div class="grid-2">
           <!-- Form Đăng nhập -->
           <div style="background:var(--bg); border:1px solid var(--line-strong); padding:18px; border-radius:var(--radius-sm);">
-            <h3 style="margin-top:0; font-size:1rem;"><i class="ri-login-box-line"></i> Đăng nhập</h3>
+            <h3 style="margin-top:0; font-size:1rem;"><i class="ri-login-box-line"></i> ${t('sys_login_title')}</h3>
             <form id="formLogin" class="form">
               <div class="field">
-                <label>Email đăng nhập</label>
+                <label>${t('sys_email_label')}</label>
                 <input type="email" id="loginEmail" placeholder="nguyenvana@gmail.com" required>
               </div>
               <div class="field">
-                <label>Mật khẩu</label>
+                <label>${t('sys_pwd_label')}</label>
                 <input type="password" id="loginPassword" placeholder="Nhập mật khẩu..." required>
               </div>
-              <button type="submit" class="primary"><i class="ri-login-circle-line"></i> Đăng nhập ngay</button>
+              <button type="submit" class="primary"><i class="ri-login-circle-line"></i> ${t('sys_btn_login')}</button>
             </form>
           </div>
 
           <!-- Form Đăng ký -->
           <div style="background:var(--bg); border:1px solid var(--line-strong); padding:18px; border-radius:var(--radius-sm);">
-            <h3 style="margin-top:0; font-size:1rem;"><i class="ri-user-add-line"></i> Đăng ký tài khoản mới</h3>
+            <h3 style="margin-top:0; font-size:1rem;"><i class="ri-user-add-line"></i> ${t('sys_register_title')}</h3>
             <form id="formRegister" class="form">
               <div class="field">
-                <label>Họ và tên</label>
+                <label>${t('sys_name_label')}</label>
                 <input type="text" id="regName" placeholder="Nguyễn Văn A" required>
               </div>
               <div class="field">
@@ -73,10 +74,10 @@ export async function render(container) {
                 <input type="email" id="regEmail" placeholder="nguyenvana@gmail.com" required>
               </div>
               <div class="field">
-                <label>Mật khẩu</label>
+                <label>${t('sys_pwd_label')}</label>
                 <input type="password" id="regPassword" placeholder="Tối thiểu 6 ký tự" required minlength="6">
               </div>
-              <button type="submit" class="primary"><i class="ri-check-line"></i> Đăng ký</button>
+              <button type="submit" class="primary"><i class="ri-check-line"></i> ${t('sys_btn_register')}</button>
             </form>
           </div>
         </div>
@@ -116,7 +117,7 @@ export async function render(container) {
     }
   }
 
-  // Đăng xuất
+  // ${t('sys_btn_logout')}
   const btnLogout = container.querySelector('#btnLogout');
   if (btnLogout) {
     btnLogout.onclick = async () => {

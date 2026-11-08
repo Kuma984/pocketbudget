@@ -1,10 +1,17 @@
+import { t } from '../i18n.js';
 import { simulatePurchase } from '../domain/finance.js';
 import { getCSession, openWishlist, readCRecords, takeSimulationPreset } from './c-context.js';
 import { action, describeSpendingCapacity, el, field, money, readLocalOverview, say, todayLocal } from './c-tools.js';
 
 // Ba cách dùng: lấy số liệu thật từ sổ trên máy, dùng số liệu mẫu, hoặc tự nhập giả định.
 // Màn này chỉ điền form khi người dùng bấm nút; không tự làm mới và không ghi giao dịch.
-const MODE_TEXT = {
+const getModeText = () => ({
+  empty: t('sim_mode_empty'),
+  ledger: t('sim_mode_ledger'),
+  sample: t('sim_mode_sample'),
+  manual: t('sim_mode_manual'),
+});
+const OLD_MODE = {
   empty: 'Chưa có số liệu. Tự nhập giả định, hoặc bấm “Lấy từ sổ trên máy”.',
   ledger: 'Đang dùng số liệu thật từ sổ trên máy.',
   sample: 'Đang dùng số liệu mẫu, không phải dữ liệu của bạn.',
@@ -15,25 +22,25 @@ export function render(container) {
   const root = el('section', null, { class: 'card c-module' });
   container.replaceChildren(root);
   root.append(
-    el('h2', 'Mô phỏng trước khi mua'),
-    el('p', 'Xem số dư và ngân sách thay đổi thế nào nếu mua món này. Mô phỏng không ghi vào sổ.', { class: 'section-desc' }),
+    el('h2', t('sim_header_title')),
+    el('p', t('sim_header_desc'), { class: 'section-desc' }),
   );
   const preset = takeSimulationPreset();
   const form = el('form', null, { class: 'form c-grid', novalidate: '' });
   const integer = { type: 'number', step: '1', inputmode: 'numeric', required: '' };
-  const item = field(form, 'Tên món', 'item', { maxlength: '120', placeholder: 'Ví dụ: Tai nghe', value: preset?.item_name ?? '' });
-  const price = field(form, 'Giá món (đ)', 'price', { ...integer, min: '1', placeholder: '400000', value: preset?.price_vnd ?? '' });
-  const balance = field(form, 'Số dư hiện tại (đ)', 'balance', { ...integer, placeholder: 'Tiền thật đang có' });
-  const budget = field(form, 'Ngân sách còn lại (đ)', 'budget', { ...integer, placeholder: 'Hạn mức − đã chi tháng này' });
-  const days = field(form, 'Số ngày còn lại', 'days', { ...integer, min: '1', max: '366' });
-  const reserved = field(form, 'Tiền muốn giữ riêng (đ)', 'reserved', { ...integer, min: '0', value: '0' });
+  const item = field(form, t('sim_item_label'), 'item', { maxlength: '120', placeholder: t('sim_item_placeholder'), value: preset?.item_name ?? '' });
+  const price = field(form, t('sim_price_label'), 'price', { ...integer, min: '1', placeholder: '400000', value: preset?.price_vnd ?? '' });
+  const balance = field(form, t('sim_balance_label'), 'balance', { ...integer, placeholder: t('sim_balance_placeholder') });
+  const budget = field(form, t('sim_budget_label'), 'budget', { ...integer, placeholder: t('sim_budget_placeholder') });
+  const days = field(form, t('sim_days_label'), 'days', { ...integer, min: '1', max: '366' });
+  const reserved = field(form, t('sim_reserved_label'), 'reserved', { ...integer, min: '0', value: '0' });
   const numbers = [balance, budget, days, reserved];
 
   const actions = el('div', null, { class: 'c-actions' });
-  const calculate = action('Tính thử', 'submit');
+  const calculate = action(t('sim_btn_calc'), 'submit');
   const secondary = el('div', null, { class: 'c-actions-secondary' });
-  const local = action('Lấy từ sổ trên máy');
-  const sample = action('Thử số liệu mẫu');
+  const local = action(t('sim_btn_local'));
+  const sample = action(t('sim_btn_sample'));
   secondary.append(local, sample);
   actions.append(calculate, secondary);
   form.append(actions);
@@ -49,7 +56,7 @@ export function render(container) {
   const setMode = next => {
     currentMode = next;
     mode.dataset.mode = next;
-    mode.textContent = MODE_TEXT[next];
+    mode.textContent = getModeText()[next];
     if (next !== 'ledger') source.textContent = '';
   };
   setMode('empty');

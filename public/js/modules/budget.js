@@ -1,3 +1,4 @@
+import { t } from '../i18n.js';
 // Ghép nối Module Ngân Sách (Thành viên B — B02) với IndexedDB & Đồng bộ
 import { listRecords, saveAndQueue, generateClientUuid } from '../db.js';
 import { formatVND, getMonthBudgetStatus, isValidAmount } from '../domain/finance.js';
@@ -58,19 +59,19 @@ export async function render(container) {
   container.innerHTML = `
     <div class="budget-screen">
       <section class="card" style="margin-bottom:20px;">
-        <h2><i class="ri-money-dollar-circle-line"></i> Cài đặt & Quản lý Ngân sách Tháng</h2>
-        <p class="section-desc">Thiết lập hạn mức chi tiêu để kiểm soát tài chính sinh viên thông minh và nhận cảnh báo khi bội chi.</p>
+        <h2><i class="ri-money-dollar-circle-line"></i> ${t('budget_mgmt_title')}</h2>
+        <p class="section-desc">${t('budget_mgmt_desc')}</p>
 
         <div style="background:var(--bg); border:1px solid var(--line-strong); padding:18px; border-radius:var(--radius-sm);">
-          <h3 style="margin-top:0; font-size:1rem;">Hạn mức tháng hiện tại (${monthKey})</h3>
+          <h3 style="margin-top:0; font-size:1rem;">${t('current_month_limit', { month: monthKey })}</h3>
           
           <form id="form-set-budget" style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap;">
             <div class="field" style="flex:2; min-width:220px;">
-              <label>Hạn mức tối đa (VNĐ):</label>
-              <input type="number" id="budget-limit-input" min="100000" step="50000" placeholder="Ví dụ: 3000000" required>
+              <label>${t('max_limit_label')}</label>
+              <input type="number" id="budget-limit-input" min="100000" step="50000" placeholder="${t('limit_placeholder')}" required>
             </div>
             <button type="submit" class="primary" style="flex:1; min-width:160px; height:46px;">
-              <i class="ri-save-line"></i> Lưu Ngân Sách
+              <i class="ri-save-line"></i> ${t('btn_save_budget')}
             </button>
           </form>
           <div id="budget-msg" style="margin-top:10px; font-size:13px;"></div>
@@ -80,16 +81,16 @@ export async function render(container) {
 
       <section class="card">
         <div class="card-header-row">
-          <h2><i class="ri-history-line"></i> Lịch sử ngân sách các tháng</h2>
+          <h2><i class="ri-history-line"></i> ${t('budget_history_title')}</h2>
         </div>
         <div class="table-responsive" style="margin-top:12px;">
           <table class="pb-table">
             <thead>
               <tr>
-                <th>Tháng</th>
-                <th style="text-align:right;">Hạn mức (VNĐ)</th>
-                <th style="text-align:right;">Đã chi (VNĐ)</th>
-                <th style="text-align:center;">Tình trạng</th>
+                <th>${t('th_month')}</th>
+                <th style="text-align:right;">${t('th_limit')}</th>
+                <th style="text-align:right;">${t('th_spent')}</th>
+                <th style="text-align:center;">${t('th_status')}</th>
               </tr>
             </thead>
             <tbody id="budget-history-body"></tbody>
@@ -119,9 +120,9 @@ export async function render(container) {
     if (current.state === 'unset') {
       statusEl.textContent = `Chưa đặt hạn mức tháng ${monthKey}. Đã chi ${formatVND(current.spent_vnd)}.`;
     } else {
-      const label = current.state === 'over' ? 'Vượt ngân sách' : current.state === 'zero' ? 'Còn đúng 0đ' : 'Ngân sách còn lại';
+      const label = current.state === 'over' ? t('over_budget_label') : current.state === 'zero' ? t('zero_budget_label') : t('remaining_budget_label');
       statusEl.innerHTML = `${label}: <b style="color:${current.state === 'ok' ? '#15803d' : '#b91c1c'};">${formatVND(current.remaining_vnd)}</b>`
-        + ` = hạn mức ${formatVND(current.limit_vnd)} − đã chi ${formatVND(current.spent_vnd)}`;
+        + t('formula_desc', { limit: formatVND(current.limit_vnd), spent: formatVND(current.spent_vnd) });
     }
 
     // Render bảng lịch sử

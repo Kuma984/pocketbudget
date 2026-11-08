@@ -1,10 +1,11 @@
+import { t } from '../i18n.js';
 import { generateClientUuid, saveAndQueue } from '../db.js';
 import { isValidAmount } from '../domain/finance.js';
 import { assertCSession, getCSession, openSimulation, readCRecords, takeWishlistPreset } from './c-context.js';
 import { renderDraft } from './c-draft.js';
 import { action, el, field, isDate, money, say, todayLocal } from './c-tools.js';
 
-const labels = { considering: 'Đang chờ', bought: 'Đã mua', skipped: 'Bỏ qua' };
+const getLabels = () => ({ considering: t('wishlist_status_considering'), bought: t('wishlist_status_bought'), skipped: t('wishlist_status_skipped') });
 
 export function render(container) {
   const root = el('section', null, { class: 'card c-module' });
@@ -12,45 +13,45 @@ export function render(container) {
   const status = el('p', 'Đang lấy dữ liệu trên thiết bị…', { role: 'status', class: 'c-status' });
   const body = el('div');
   const draftArea = el('div');
-  root.append(el('h2', 'Danh sách chờ mua'), el('p', 'Lưu món muốn mua và chọn ngày xem lại. Đưa món vào danh sách chưa làm thay đổi số dư.', { class: 'section-desc' }), status, body, draftArea);
+  root.append(el('h2', t('wishlist_header_title')), el('p', t('wishlist_header_desc'), { class: 'section-desc' }), status, body, draftArea);
   const preset = takeWishlistPreset();
   let current;
   let editing = null;
   let busy = false;
   let rows = [];
   const form = el('form', null, { class: 'form c-grid' });
-  const name = field(form, 'Tên món', 'wishlist-name', { maxlength: '120', required: '', value: preset?.name ?? '' });
-  const price = field(form, 'Giá dự kiến (đ)', 'wishlist-price', { type: 'number', min: '1', step: '1', required: '', value: preset?.price_vnd ?? '' });
-  const review = field(form, 'Ngày xem lại', 'wishlist-review', { type: 'date', required: '', value: todayLocal() });
+  const name = field(form, t('wishlist_item_name'), 'wishlist-name', { maxlength: '120', required: '', value: preset?.name ?? '' });
+  const price = field(form, t('wishlist_price_label'), 'wishlist-price', { type: 'number', min: '1', step: '1', required: '', value: preset?.price_vnd ?? '' });
+  const review = field(form, t('wishlist_review_label'), 'wishlist-review', { type: 'date', required: '', value: todayLocal() });
   const actions = el('div', null, { class: 'c-actions' });
-  const save = action('Thêm món', 'submit');
-  const reset = action('Bỏ chỉnh sửa');
+  const save = action(t('wishlist_btn_add'), 'submit');
+  const reset = action(t('wishlist_btn_cancel_edit'));
   reset.hidden = true;
   const list = el('div', null, { class: 'c-list' });
   actions.append(save, reset); form.append(actions);
   const resetForm = () => {
-    editing = null; form.reset(); review.value = todayLocal(); save.textContent = 'Thêm món'; reset.hidden = true;
+    editing = null; form.reset(); review.value = todayLocal(); save.textContent = t('wishlist_btn_add'); reset.hidden = true;
   };
   reset.addEventListener('click', resetForm);
   function draw() {
     list.replaceChildren();
-    if (!rows.length) { list.append(el('p', 'Chưa có món nào trong danh sách. Thêm món ở trên hoặc từ màn Mô phỏng.', { class: 'c-muted' })); return; }
+    if (!rows.length) { list.append(el('p', t('wishlist_empty'), { class: 'c-muted' })); return; }
     const now = todayLocal();
     const ordered = [...rows].sort((a, b) => String(a.review_on).localeCompare(String(b.review_on)));
     for (const row of ordered) {
       const due = row.status === 'considering' && row.review_on <= now;
       const entry = el('article', null, { class: 'c-entry' });
-      entry.append(el('h3', row.name), el('p', [money(row.price_vnd), labels[row.status] ?? row.status, 'Xem lại: ' + row.review_on, due ? 'Đến ngày xem lại' : ''].filter(Boolean).join(' · ')));
+      entry.append(el('h3', row.name), el('p', [money(row.price_vnd), getLabels()[row.status] ?? row.status, 'Xem lại: ' + row.review_on, due ? t('wishlist_due_badge') : ''].filter(Boolean).join(' · ')));
       if (row.status === 'considering') {
-        const edit = action('Sửa');
-        const simulate = action('Mô phỏng');
-        const buy = action('Đã mua…');
-        const skip = action('Bỏ qua');
+        const edit = action(t('wishlist_btn_edit'));
+        const simulate = action(t('wishlist_btn_sim'));
+        const buy = action(t('wishlist_btn_buy'));
+        const skip = action(t('wishlist_btn_skip'));
         const rowActions = el('div', null, { class: 'c-row-actions' });
         rowActions.append(edit, simulate, buy, skip); entry.append(rowActions);
         edit.addEventListener('click', () => {
           editing = row.id; name.value = row.name; price.value = row.price_vnd; review.value = row.review_on;
-          save.textContent = 'Lưu chỉnh sửa'; reset.hidden = false; name.focus();
+          save.textContent = t('wishlist_btn_save_edit'); reset.hidden = false; name.focus();
         });
         simulate.addEventListener('click', () => openSimulation({ item_name: row.name, price_vnd: row.price_vnd }));
         buy.addEventListener('click', () => {
