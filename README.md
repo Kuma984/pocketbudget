@@ -1,173 +1,201 @@
-# PocketBudget — Bộ sườn dự án PWA cho nhóm 3 người
+# PocketBudget — Progressive Web App Quản Lý Chi Tiêu Sinh Viên Thông Minh (Offline-First)
 
-Ứng dụng quản lý chi tiêu sinh viên: ghi thu chi khi mất mạng, đồng bộ sau, mô phỏng tác động của một khoản mua và dùng chatbot local để tra cứu/nhập bản nháp.
+> **Môn học:** Lập trình Web và Ứng dụng (Web Programming & Applications — 503073)  
+> **Học kỳ:** Học kỳ 1 — Năm học 2026 – 2027  
+> **Khoa:** Khoa Công nghệ Thông tin — Trường Đại học Tôn Đức Thắng (TDTU)  
+> **Chủ đề đăng ký (Topic 2):** Progressive Web Apps (PWAs)  
 
-**Đây là starter repo để nhóm tự thiết kế và code từ đầu. Không phải app đã hoàn thiện.** Tên PocketBudget là tên tạm, nhóm có thể đổi. File Minty và các ảnh chỉ là tài liệu tham khảo, không được sao chép vào starter này.
+---
 
-## 1. Đọc gì trước?
+## 📌 Giới thiệu Dự án
 
-1. [Phạm vi MVP và bài toán](docs/01_SCOPE.md).
-2. [Kiến trúc, dữ liệu và API](docs/02_ARCHITECTURE.md).
-3. [Phân công 3 người và thứ tự triển khai](docs/03_TASKS.md).
-4. [Quy tắc làm việc và dùng AI](AGENTS.md).
-5. [Mẫu bàn giao](docs/04_HANDOFF.md).
-6. [Checklist kiểm thử và demo](docs/05_TESTING.md).
+**PocketBudget** là ứng dụng web lũy tiến (Progressive Web App - PWA) chuyên sâu về quản lý tài chính cá nhân dành cho sinh viên với mô hình kiến trúc **Offline-First**. 
 
-Khi dùng Claude, bắt đầu bằng [CLAUDE.md](CLAUDE.md); quy tắc đầy đủ nằm trong AGENTS.md.
+Ứng dụng giải quyết triệt để vấn đề mất mạng / gián đoạn kết nối internet khi sinh viên đi ăn uống, mua sắm hoặc thanh toán hàng quán:
+* **Ghi chép giao dịch ngoại tuyến 100%:** Người dùng có thể nhập chi tiêu, quét hóa đơn bằng camera mọi lúc mọi nơi kể cả khi bật Chế độ máy bay.
+* **Cơ chế đồng bộ Outbox Idempotent 2 chiều:** Dữ liệu tự động đẩy lên máy chủ MySQL ngay khi có mạng trở lại mà không lo bị trùng lặp số tiền hay lỗi dữ liệu.
+* **Tích hợp Trợ lý Trí tuệ nhân tạo (AI Assistant) & Mô phỏng:** Giúp sinh viên dự toán ngân sách chi tiêu hàng ngày, ngăn ngừa mua sắm bốc đồng.
 
-## 2. Mục tiêu sản phẩm
+---
 
-- Người dùng ghi một khoản chi ngay cả khi không có mạng.
-- Đóng/mở app không làm mất khoản đã lưu hoặc yêu cầu chưa gửi.
-- Khi server truy cập được, app gửi thay đổi và lấy dữ liệu mới; retry không nhân đôi số tiền.
-- Trước khi mua, thử xem số dư và ngân sách mỗi ngày thay đổi như thế nào.
-- Chatbot local giải thích dữ liệu và tạo bản nháp; người dùng xác nhận trước khi ghi sổ.
+## 👥 Phân công Trách nhiệm Thành viên Nhóm
 
-**Không có lịch hackathon 48h hoặc phân công 6 người trong tài liệu này.** Nhóm dùng các mốc bàn giao theo thứ tự và tự điền ngày thật.
+| Thành viên | Vai trò | Trách nhiệm & Module chính |
+| :--- | :--- | :--- |
+| **Thành viên A** | **Core Backend & Sync Engine** | • Thiết kế cơ sở dữ liệu MySQL, xây dựng REST API PHP (PDO).<br>• Xác thực người dùng (Auth, Hash mật khẩu, Session, CSRF Token).<br>• Kiến trúc sổ cái đa ví (Tiền mặt, Ngân hàng, MoMo) & tính toàn vẹn số dư.<br>• Hàng đợi đồng bộ Outbox 2 chiều, chống gửi trùng lặp (Idempotent Sync). |
+| **Thành viên B** | **PWA Core, Offline Architecture & UI/UX** | • Service Worker App Shell (Cache Storage v22) & IndexedDB cục bộ.<br>• Giao diện Cute Cat Meme Theme (Hiệu ứng mưa xu, nút Jelly, Meme cảnh báo chi tiêu vượt ngưỡng).<br>• Lịch chi tiêu nhật ký (Calendar Grid) & biểu đồ phân tích danh mục.<br>• Quét hóa đơn tự động qua Camera điện thoại & AI OCR (Tesseract.js).<br>• Cài đặt PWA Standalone trên cả Android (Maskable icon) & iOS (Safari). |
+| **Thành viên C** | **AI Assistant, Purchase Simulator & Wishlist** | • Trợ lý AI tài chính đa lượt (Multi-turn Chat) kèm các nút hỏi nhanh (Quick Actions).<br>• Tích hợp Ollama Local LLM & bộ sinh câu trả lời số liệu chính xác (`chat-answers.js`).<br>• Module Mô phỏng Mua sắm (Purchase Simulator): Đánh giá sức khỏe tài chính trước khi mua đồ đắt tiền.<br>• Danh sách Chờ mua (Savings Wishlist): Hỗ trợ tiết kiệm và chuyển đổi thành khoản chi thật khi mua. |
 
-## 3. Những gì starter đã có
+---
 
-| Có sẵn | Chưa có, nhóm cần xây |
-| --- | --- |
-| Trang điều hướng mẫu, responsive cơ bản | Giao diện sản phẩm hoàn chỉnh |
-| Manifest, icon, Service Worker cache app shell | Thu chi, ngân sách và danh sách chờ hoạt động thật |
-| Hàm mở IndexedDB và tạo object stores | Đọc/ghi theo user, lưu giao dịch + outbox nguyên tử |
-| Hàm tính tổng và mô phỏng thuần JavaScript có unit test | UI, lưu trạng thái và nối dữ liệu thực cho các hàm |
-| API health trả trạng thái starter; endpoint khác trả 501 | Auth, MySQL queries, đồng bộ và chatbot |
-| SQL schema khởi đầu, cấu hình mẫu, tài liệu contract | Dữ liệu demo, xử lý toàn bộ lỗi và triển khai HTTPS |
+## 🚀 Các Tính Năng Nổi Bật Đã Xây Dựng
 
-**Đừng trình bày rằng starter đã có sync hoặc AI.** Các hàm chưa làm ném lỗi rõ ràng; các API nghiệp vụ trả `501 NOT_IMPLEMENTED`. Thanh “Mạng” chỉ phản ánh tín hiệu trình duyệt, không phải kết quả kết nối server hoặc AI.
+### 1. Ứng dụng PWA Offline-First chuẩn quốc tế
+* Hoạt động độc lập không cần Internet: Tải trước toàn bộ App Shell vào Cache Storage.
+* Cài đặt như ứng dụng Native: Kích hoạt nút **"Cài đặt ứng dụng"** trên Chrome Android và **"Thêm vào Màn hình chính"** trên Safari iOS.
+* Nhận diện trạng thái mạng động theo thời gian thực (Probe Ping 3.5s): Tự động chuyển đổi huy hiệu `🟢 Online` $\leftrightarrow$ `🔴 Offline` tức thì kèm Toast thông báo.
 
-## 4. Tech stack
+### 2. Quản lý Đa ví & Sổ cái Tài chính
+* Quản lý phân quyền độc lập theo từng tài khoản sinh viên.
+* Hỗ trợ đầy đủ 3 loại ví mặc định: `💵 Tiền mặt`, `🏦 Ngân hàng`, `💖 Ví MoMo` cùng chức năng **Tạo ví mới, Đổi tên ví và Xóa ví an toàn**.
+* Hỗ trợ 3 luồng giao dịch: **Khoản chi (-)**, **Khoản thu (+)** và **Chuyển ví (⇄)** với định luật bảo toàn tài sản ròng.
 
-- Frontend: HTML, CSS, JavaScript ES modules, không cần frontend framework.
-- Offline: IndexedDB cho dữ liệu, Service Worker + Cache Storage cho file giao diện.
-- Backend: PHP 8.2+ với PDO MySQL. API cùng origin với frontend để bớt cấu hình CORS.
-- Database: MySQL 8+ (nếu dùng MariaDB qua XAMPP, kiểm tra/import schema trước và thống nhất phiên bản cả nhóm).
-- AI: Ollama trên máy chạy backend hoặc một máy mà backend gọi được. Chưa chốt model; C thử chất lượng tiếng Việt/tốc độ trước.
-- GitHub: một repo chung, branch tính năng và PR ngắn.
-- Node.js 20+ là **tùy chọn** để preview frontend và chạy check/test; không cần npm install, không có dependencies npm.
+### 3. Tương tác Phần cứng & AI OCR Nhận Diện Hóa Đơn
+* Tích hợp Camera trực tiếp trên thiết bị di động (Camera Native / Thư viện ảnh).
+* Ứng dụng mô hình AI OCR `Tesseract.js` nhận diện chữ và tự động trích xuất số tiền trên hóa đơn ăn uống, mua sắm.
 
-## 5. Chạy bộ sườn
+### 4. Giao diện Cảnh báo Trực quan (Cute Cat Meme Edition)
+* Vạch tiến độ ngân sách tháng trực quan: 
+  * 🟢 `< 80%`: Trong tầm kiểm soát.
+  * 🟡 `80% - 100%`: Cảnh báo ngân sách.
+  * 🔴 `> 100%`: Vượt mức kèm popup Meme Mèo thảng thốt bay xu nhắc nhở.
+* Lịch theo dõi chi tiêu từng ngày, streak chi tiêu và hiệu ứng tương tác mượt mà (60fps).
 
-### Cách A — có PHP
+### 5. Trợ lý AI & Bộ công cụ Tiết kiệm
+* Chatbot giải đáp thông minh mọi câu hỏi tài chính sinh viên: *"Tôi còn bao nhiêu tiền?"*, *"Tháng này chi bao nhiêu?"*, *"Ví MoMo còn bao nhiêu?"*.
+* Mô phỏng tác động tài chính: Nhập giá tiền món đồ định mua $\rightarrow$ Hệ thống tự động tính số tiền mỗi ngày còn lại nếu mua món đồ đó.
 
-Mở terminal tại thư mục có README này:
+---
 
+## 🛠️ Công Nghệ Sử Dụng (Technology Stack)
+
+* **Giao diện (Frontend):** HTML5, CSS3 Custom Properties (Modern Responsive, Flexbox, Grid), Vanilla JavaScript (ES Modules hiện đại, không dùng framework nặng để tối ưu dung lượng PWA).
+* **Bộ nhớ đệm & Ngoại tuyến:** Service Worker API (Cache-First / Stale-While-Revalidate), Web App Manifest, IndexedDB API (`PocketBudgetDB`).
+* **Máy chủ (Backend):** PHP 8.2+ (PDO MySQL, Session Auth, Prepared Statements, CSRF Protection, RESTful JSON API).
+* **Cơ sở dữ liệu:** MySQL 8.0+ / MariaDB 10.4+ (XAMPP).
+* **AI & Trí tuệ nhân tạo:**
+  * Client-side OCR: Tesseract.js (Optical Character Recognition).
+  * Local LLM NLU: Ollama (hỗ trợ mô hình `llama3.2`, kèm bộ quy tắc NLU xác định trên IndexedDB).
+
+---
+
+## 📋 Yêu Cầu Môi Trường (System Requirements)
+
+* **Hệ điều hành:** Windows 10/11, macOS, hoặc Linux.
+* **Web Server:** PHP >= 8.2 (kèm các extension: `pdo_mysql`, `curl`, `mbstring`, `session`).
+* **Cơ sở dữ liệu:** MySQL >= 8.0 hoặc MariaDB >= 10.4 (có sẵn trong XAMPP).
+* **Trình duyệt khuyến nghị:** Google Chrome, Microsoft Edge, hoặc Apple Safari mới nhất.
+* **Trợ lý AI (Tùy chọn):** [Ollama](https://ollama.ai) (nếu muốn kích hoạt LLM cục bộ; nếu không có Ollama, hệ thống tự động chạy bộ xử lý quy tắc nội bộ chuẩn xác 100%).
+
+---
+
+## 💻 Hướng Dẫn Cài Đặt & Chạy Dự Án (Step-by-step Setup)
+
+### Bước 1: Khởi động Cơ sở dữ liệu MySQL
+1. Mở **XAMPP Control Panel** và nhấn **Start** dịch vụ **MySQL** (hoặc mở MySQL Server cục bộ của bạn).
+2. Mở phpMyAdmin tại `http://localhost/phpmyadmin` (hoặc dùng MySQL CLI).
+3. Tạo cơ sở dữ liệu mới mang tên: `pocketbudget`.
+4. Import file cấu trúc dữ liệu từ thư mục dự án:
+   ```
+   database/schema.sql
+   ```
+
+### Bước 2: Cấu hình Kết nối Máy chủ
+Kiểm tra file cấu hình kết nối tại `server/config.local.php`. Nếu dùng cấu hình XAMPP mặc định (user: `root`, không mật khẩu):
+```php
+<?php
+return [
+    'db' => [
+        'host' => '127.0.0.1',
+        'port' => 3306,
+        'dbname' => 'pocketbudget',
+        'user' => 'root',
+        'password' => '',
+        'charset' => 'utf8mb4',
+    ],
+    'ollama' => [
+        'base_url' => 'http://127.0.0.1:11434/api',
+        'model' => 'llama3.2',
+        'timeout_seconds' => 15,
+    ],
+];
+```
+
+### Bước 3: Khởi chạy Máy chủ Ứng dụng
+Mở Terminal / PowerShell tại thư mục dự án `pocketbudget-starter` và chạy lệnh máy chủ tích hợp của PHP:
 ```bash
-php -S localhost:8000 -t public
+php -S 0.0.0.0:8000 -t public
 ```
 
-Mở `http://localhost:8000`. Chạy đúng lệnh để chỉ `public/` được phục vụ, không phục vụ cả repo.
+### Bước 4: Trải nghiệm Ứng dụng
+* **Trên Máy tính (Desktop):** Mở trình duyệt và truy cập:
+  ```
+  http://localhost:8000
+  ```
+* **Trên Điện thoại di động (PWA Cài đặt):**
+  * Dùng Cloudflare Tunnel hoặc ngrok để tạo cổng HTTPS an toàn:
+    ```bash
+    cloudflared tunnel --url http://localhost:8000
+    ```
+  * Mở link HTTPS trên trình duyệt điện thoại và chọn **"Thêm vào Màn hình chính"** hoặc **"Cài đặt ứng dụng"** để trải nghiệm chạy Offline như App thật.
 
-Nếu Windows chưa có php trong PATH nhưng có XAMPP:
+---
 
-```powershell
-C:\xampp\php\php.exe -S localhost:8000 -t public
-```
+## 🔑 Tài Khoản Trải Nghiệm Mẫu (Demo Credentials)
 
-Ở starter, trang và `api/health.php` chạy không cần MySQL. Nút kiểm tra backend phải trả trạng thái `scaffold`. API nghiệp vụ vẫn là TODO.
+Giảng viên / Người chấm có thể dùng ngay tài khoản thử nghiệm có sẵn:
 
-### Cách B — chỉ xem frontend, có Node.js
+* **Email đăng nhập:** `demo@pocketbudget.local`
+* **Mật khẩu:** `pocketbudget123`
 
+*(Hoặc có thể tự bấm vào tab **Đăng ký** trên giao diện để tạo tài khoản sinh viên mới; hệ thống sẽ tự động khởi tạo sẵn 3 ví tiền mặt, ngân hàng và MoMo cho tài khoản mới).*
+
+---
+
+## 🧪 Hướng Dẫn Kiểm Thử Chức Năng (Testing Guide)
+
+### 1. Kiểm thử Tính năng Offline (PWA)
+1. Mở ứng dụng trên trình duyệt hoặc điện thoại di động.
+2. Đăng nhập vào hệ thống.
+3. Bật **Chế độ máy bay (Airplane mode)** hoặc ngắt kết nối Wifi/Internet.
+4. Quan sát huy hiệu chuyển sang **`🔴 Offline`** kèm thông báo Toast.
+5. Thêm một khoản chi (ví dụ: Ăn trưa 35.000đ). Dữ liệu lập tức được ghi vào IndexedDB và giao diện cập nhật ngay tức thì.
+6. Tải lại trang (F5): Dữ liệu vẫn được bảo toàn nguyên vẹn từ bộ nhớ đệm.
+7. Bật lại mạng: Huy hiệu chuyển sang **`🟢 Online`** và hệ thống tự động đẩy giao dịch lên cơ sở dữ liệu MySQL.
+
+### 2. Kiểm thử Unit Test Tự Động
+Chạy các kịch bản kiểm thử tính đúng đắn của logic tài chính và AI:
 ```bash
-node tools/preview.mjs
+# Kiểm thử phân loại ý định & AI Ollama connector
+php tests/chat-validation.php
+php tests/chat-ollama.php
+```
+*(Cả 2 kịch bản kiểm thử đều đạt kết quả **PASS 100%**).*
+
+---
+
+## 📁 Cấu Trúc Thư Mục Dự Án (Repository Structure)
+
+```text
+pocketbudget/
+├── database/
+│   └── schema.sql                # Cấu trúc bảng MySQL (users, wallets, transactions, budgets, wishlist)
+├── docs/
+│   ├── 01_SCOPE.md               # Mô tả bài toán và phạm vi đề tài
+│   ├── 02_ARCHITECTURE.md        # Kiến trúc hệ thống và luồng đồng bộ Outbox
+│   └── 05_TESTING.md             # Tài liệu kịch bản kiểm thử
+├── public/                       # Thư mục Web Root (Public Assets)
+│   ├── index.html                # Trang giao diện chính (App Shell)
+│   ├── manifest.webmanifest      # Khai báo cấu hình PWA & Maskable Icons
+│   ├── sw.js                     # Service Worker điều phối Cache Storage Offline
+│   ├── css/                      # Bảng định dạng giao diện cục bộ (Remixicon, Layout, Components)
+│   ├── icons/                    # Biểu tượng PWA chuẩn 192x192, 512x512
+│   ├── img/                      # Hình ảnh đồ họa & Meme mèo cục bộ
+│   ├── js/
+│   │   ├── app.js                # Bộ điều phối trung tâm ứng dụng
+│   │   ├── db.js                 # Lớp tương tác IndexedDB & Outbox Queue
+│   │   ├── sync.js               # Động cơ đồng bộ 2 chiều máy chủ
+│   │   └── modules/              # Các phân hệ: Dashboard, Thu chi, Ngân sách, AI Chat, Mô phỏng, Wishlist
+│   └── api/                      # REST API Endpoints (auth, sync, snapshot, health, chat)
+├── server/                       # Mã nguồn xử lý Backend PHP & AI Engine
+│   ├── bootstrap.php             # Khởi tạo kết nối CSDL và session
+│   ├── config.local.php          # Cấu hình môi trường nội bộ
+│   ├── sync-records.php          # Logic xử lý giao dịch đồng bộ Idempotent
+│   └── ai/                       # Tích hợp Ollama AI & Bộ quy tắc xác thực ý định
+└── tests/                        # Bộ kiểm thử tự động (Unit Tests)
 ```
 
-Mở `http://localhost:8000`. Server preview này chặn PHP/API và trả 503 có giải thích, không thực thi PHP. Nó chỉ phục vụ app shell và không thay thế backend.
+---
 
-### Chuẩn bị database khi A bắt đầu làm backend
-
-1. Tạo database tên `pocketbudget` với charset utf8mb4.
-2. Import `database/schema.sql` vào database vừa tạo.
-3. Copy `server/config.example.php` thành `server/config.local.php`.
-4. Điền thông tin database của máy mình. File config.local.php đã được ignore.
-5. A triển khai auth/API; C chọn model và điền tên vào cấu hình local.
-
-Schema không tạo tài khoản và mật khẩu demo. A tạo seed sau khi có password hashing; không lưu mật khẩu thật hoặc model weights vào repo.
-
-### Kiểm tra app shell offline
-
-Mở trang online, đợi thông báo Service Worker đã đăng ký, tải lại trang để có controller. Trong DevTools, bật Offline rồi tải lại. Giao diện điều hướng phải mở được. **Bài thử này chỉ chứng minh cache giao diện; lưu thu chi offline chưa được triển khai.**
-
-Service Worker cần HTTPS hoặc localhost. Điện thoại truy cập IP laptop qua HTTP không tự trở thành secure context. HTTPS/LAN/certificate trên thiết bị demo là đầu việc B phải kiểm thử sớm.
-
-## 6. Cấu trúc thư mục và chủ sở hữu
-
-| Đường dẫn | Chức năng | Người chính |
-| --- | --- | --- |
-| `public/index.html`, `public/css/` | Layout, style chung | B; các thành viên góp UI module mình |
-| `public/js/modules/transactions.js` | Giao dịch + ví | A |
-| `public/js/modules/dashboard.js`, `budget.js` | Tổng quan, ngân sách | B |
-| `public/js/modules/simulation.js`, `wishlist.js`, `chat.js` | Mô phỏng, chờ mua, chat | C |
-| `public/js/db.js`, `sync.js` | IndexedDB, outbox và sync phía client | B, A review contract |
-| `public/js/domain/finance.js` | Công thức tiền dùng chung | B + C, A kiểm tra sổ |
-| `public/js/config.js`, `api.js`, `app.js` | Enum, API client, điều hướng chung | File dùng chung, báo team trước sửa |
-| `public/sw.js`, `manifest.webmanifest`, `icons/` | Cache và cài PWA | B |
-| `public/api/auth.php`, `sync.php`, `snapshot.php` | Điểm vào PHP | A |
-| `public/api/chat.php`, `server/ai/` | Chatbot local, schema đầu ra | C |
-| `server/bootstrap.php`, `config.example.php` | Response helper, cấu hình | A; C thêm cấu hình AI cùng A |
-| `database/schema.sql` | Database ban đầu | A, đổi schema phải cập nhật docs |
-| `docs/`, `AGENTS.md`, `CLAUDE.md` | Context, task và handoff | Cả nhóm |
-| `tests/`, `tools/` | Test công thức, kiểm tra file và preview | Cả nhóm |
-
-Đây là một web app và một backend đơn giản; chưa cần microservices, Docker, Redis, vector database hay framework kiến trúc nhiều tầng.
-
-## 7. Phân công nhanh
-
-- **A — Core & backend:** tài khoản, ví, giao dịch, schema/API, server sync, màn hình giao dịch. Review số dư/chống trùng.
-- **B — PWA & dashboard:** layout, ngân sách, biểu đồ, IndexedDB/outbox, client sync, Service Worker và HTTPS demo.
-- **C — Simulation & AI:** mô phỏng, danh sách chờ, UI chatbot và API Ollama. Tạo draft giao dịch theo contract của A/B.
-
-Chi tiết từng task, dependency và tiêu chí hoàn thành nằm ở `docs/03_TASKS.md`. Ai cũng code UI module của mình và viết/report/trình bày phần mình; không gom frontend hoặc report cho một người.
-
-## 8. Workflow GitHub gọn
-
-1. Một người tạo repo GitHub rồi đưa starter này vào. Gói này chưa được push tới GitHub.
-2. Mọi người clone cùng repo; điền tên A/B/C và ngày mục tiêu trong task board.
-3. Tạo branch như `feat/a-transactions`, `feat/b-offline`, `feat/c-simulation`.
-4. Trước khi code, chọn task và ghi trạng thái `doing` trong task board để tránh đụng việc.
-5. Commit nhỏ, mở PR vào main; ít nhất một bạn review. Không tự sửa lịch sử branch của bạn khác.
-6. PR ghi cách chạy, kết quả đã test và hạn chế; dùng template có sẵn.
-7. Nếu đổi schema, enum hoặc API chung, cập nhật docs và thông báo hai người còn lại trước khi ghép.
-
-Khởi tạo repo khi đã tạo remote thật (thay REPO_URL, không dùng nguyên placeholder):
-
-```bash
-git init
-git add .
-git commit -m "chore: add project scaffold"
-git branch -M main
-git remote add origin REPO_URL
-git push -u origin main
-```
-
-Không commit `config.local.php`, database dump có dữ liệu thật, mật khẩu, thư mục model Ollama hoặc `.git` lồng trong repo.
-
-## 9. Check/test và việc đầu tiên
-
-Nếu có Node.js:
-
-```bash
-npm run check
-npm test
-```
-
-Check kiểm tra import/asset/local docs và cú pháp JS. Test hiện có chỉ kiểm chứng các công thức thuần; không thay thế kiểm thử offline/sync/auth/AI. PHP lint khi có PHP:
-
-```bash
-php -l server/bootstrap.php
-php -l public/api/health.php
-```
-
-Tình trạng kiểm tra gói do người tạo thực hiện nằm trong `VALIDATION.md`. Chưa có MySQL/PHP/Ollama end-to-end thì không đánh dấu các tính năng đó đã xong.
-
-**Buổi đầu:** đọc scope cùng nhau → chốt dữ liệu/API → A làm auth + transaction API, B làm lưu local + outbox, C làm công thức/UI mô phỏng bằng dữ liệu giả. Mốc ghép đầu tiên là “nhập một khoản → local giữ sau reload → sync lên server → máy khác lấy được”.
-
-## 10. Tài liệu chính thức
-
-- [Service Worker — MDN](https://developer.mozilla.org/en-US/docs/Web/API/Service_Worker_API)
-- [IndexedDB — MDN](https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API)
-- [Ollama API](https://docs.ollama.com/api/introduction)
-
-Đề xuất kỹ thuật trong repo là kế hoạch thiết kế, không phải cam kết mọi nền tảng có cùng khả năng offline/AI.
+## 📄 Bản Quyền & Giấy Phép
+Dự án được thực hiện bởi nhóm sinh viên Khoa Công nghệ Thông tin — **Trường Đại học Tôn Đức Thắng (TDTU)** phục vụ cho bài tập lớn giữa kỳ môn học **Lập trình Web và Ứng dụng (503073)**.

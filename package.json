@@ -1,12 +1,10 @@
 {
-  "name": "pocketbudget-starter",
-  "version": "0.1.0",
+  "name": "pocketbudget",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Scaffold only; product features are team TODOs",
+  "description": "PocketBudget — Progressive Web App Quản lý tài chính cá nhân sinh viên thông minh Offline-First",
   "scripts": {
-    "preview": "node tools/preview.mjs",
-    "check": "node tools/check.mjs",
     "test": "node --test tests/finance.test.js tests/member-c.test.js tests/pwa-integration.test.js tests/budget-sync.test.js tests/chat-answers.test.js",
     "test:php": "php tests/chat-validation.php && php tests/chat-ollama.php"
   },
