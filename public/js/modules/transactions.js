@@ -1,6 +1,7 @@
 // Thành viên A — Task A03: Màn hình Thu chi & Ví (Giao diện chuẩn Netlify Cute Theme)
 import { CATEGORIES } from '../config.js';
-import { listRecords, saveAndQueue, generateClientUuid } from '../db.js';
+import { listRecords, saveAndQueue, generateClientUuid, openDatabase } from '../db.js';
+import { showToast } from '../app.js';
 import { calculateWalletBalances, calculateTotalBalance, formatVND } from '../domain/finance.js';
 import { apiRequest } from '../api.js';
 
@@ -237,21 +238,124 @@ export async function render(container) {
 
     document.getElementById('total-balance').textContent = formatVND(total);
 
-    // Render danh sách ví
+    // Render danh sách ví (có nút chỉnh sửa và xóa ví)
     const walletList = document.getElementById('wallet-list');
     walletList.innerHTML = '';
     wallets.forEach(w => {
       const b = balances.get(w.id) || 0; // calculateWalletBalances trả về Map
       const chip = document.createElement('div');
       chip.className = 'card';
-      chip.style.padding = '12px 18px';
+      chip.style.padding = '12px 16px';
       chip.style.flex = '1';
-      chip.style.minWidth = '140px';
+      chip.style.minWidth = '150px';
+      chip.style.display = 'flex';
+      chip.style.justifyContent = 'space-between';
+      chip.style.alignItems = 'flex-start';
+      chip.style.background = '#ffffff';
+      chip.style.position = 'relative';
+
       chip.innerHTML = `
-        <div style="font-size:0.82rem; color:var(--muted);">${escapeHtml(w.name)}</div>
-        <div style="font-size:1.15rem; font-weight:800; color:var(--text); margin-top:2px;">${formatVND(b)}</div>
+        <div>
+          <div style="font-size:0.82rem; color:var(--muted); font-weight:600;">${escapeHtml(w.name)}</div>
+          <div style="font-size:1.18rem; font-weight:800; color:var(--text); margin-top:2px;">${formatVND(b)}</div>
+        </div>
+        <div style="display:flex; gap:2px; margin-left:6px;">
+          <button type="button" class="btn-edit-wallet jelly-btn" data-id="${w.id}" data-name="${escapeHtml(w.name)}" title="Đổi tên ví" style="background:none; border:none; color:var(--muted); cursor:pointer; padding:4px 6px; font-size:0.95rem; border-radius:4px;">
+            <i class="ri-edit-line"></i>
+          </button>
+          <button type="button" class="btn-delete-wallet jelly-btn" data-id="${w.id}" data-name="${escapeHtml(w.name)}" title="Xóa ví này" style="background:none; border:none; color:#ef4444; cursor:pointer; padding:4px 6px; font-size:0.95rem; border-radius:4px;">
+            <i class="ri-delete-bin-line"></i>
+          </button>
+        </div>
       `;
       walletList.appendChild(chip);
+    });
+
+    // Bắt sự kiện xóa ví
+    walletList.querySelectorAll('.btn-delete-wallet').forEach(btn => {
+      btn.onclick = async (e) => {
+        e.stopPropagation();
+        const id = btn.getAttribute('data-id');
+        const name = btn.getAttribute('data-name');
+
+        if (wallets.length <= 1) {
+          alert('Hệ thống cần ít nhất 1 ví tiền để hoạt động, không thể xóa chiếc ví cuối cùng.');
+          return;
+        }
+
+        const bal = balances.get(id) || 0;
+        const hasTx = transactions.some(t => t.wallet_id === id || t.destination_wallet_id === id);
+
+        let confirmMsg = `Bạn có chắc chắn muốn xóa ví "${name}" không?`;
+        if (bal !== 0 || hasTx) {
+          confirmMsg = `Ví "${name}" đang có số dư ${formatVND(bal)} hoặc đã có giao dịch liên quan.\nBạn có chắc chắn muốn xóa ví này không?`;
+        }
+
+        if (!confirm(confirmMsg)) return;
+
+        try {
+          const userId = getUserId();
+          const targetW = wallets.find(item => item.id === id);
+          await saveAndQueue({
+            user_id: String(userId),
+            entity: 'wallet',
+            action: 'delete',
+            base_version: targetW?.version || 1,
+            record: { id: id, user_id: String(userId), deleted_at: new Date().toISOString() }
+          });
+
+          // Xóa ngay trong IndexedDB cục bộ
+          const db = await openDatabase();
+          try {
+            const tx = db.transaction(['wallets'], 'readwrite');
+            tx.objectStore('wallets').delete(id);
+          } catch {}
+
+          if (typeof showToast === 'function') {
+            showToast(`Đã xóa ví "${name}" thành công!`);
+          } else {
+            alert(`Đã xóa ví "${name}" thành công!`);
+          }
+          await loadData();
+        } catch (err) {
+          alert('Không thể xóa ví: ' + err.message);
+        }
+      };
+    });
+
+    // Bắt sự kiện đổi tên ví
+    walletList.querySelectorAll('.btn-edit-wallet').forEach(btn => {
+      btn.onclick = async (e) => {
+        e.stopPropagation();
+        const id = btn.getAttribute('data-id');
+        const oldName = btn.getAttribute('data-name');
+        const newName = prompt(`Nhập tên mới cho ví:`, oldName);
+        if (!newName || !newName.trim() || newName.trim() === oldName) return;
+
+        try {
+          const userId = getUserId();
+          const targetW = wallets.find(item => item.id === id);
+          const updatedRecord = {
+            ...targetW,
+            name: newName.trim(),
+            user_id: String(userId)
+          };
+          await saveAndQueue({
+            user_id: String(userId),
+            entity: 'wallet',
+            action: 'upsert',
+            base_version: targetW?.version || 1,
+            record: updatedRecord
+          });
+
+          if (typeof showToast === 'function') {
+            showToast(`Đã đổi tên ví thành "${newName.trim()}"!`);
+          }
+          await loadData();
+        } catch (err) {
+          alert('Không thể đổi tên ví: ' + err.message);
+        }
+      };
     });
 
     // Điền dữ liệu vào dropdown ví
@@ -361,22 +465,30 @@ export async function render(container) {
     const balance = parseInt(balanceInput.value, 10) || 0;
 
     if (!name) {
-      alert('Vui lòng nhập tên ví.');
+      alert('Vui lòng nhập tên ví (ví dụ: Tiền mặt, Ngân hàng, MoMo, MBBank...).');
+      nameInput.focus();
       return;
     }
 
-    const userId = getUserId();
+    const currentUserId = getUserId();
+    const currentWallets = await listRecords('wallets', currentUserId);
+    if (currentWallets.some(w => (w.name || '').trim().toLowerCase() === name.toLowerCase())) {
+      alert(`Ví "${name}" đã tồn tại. Vui lòng chọn tên khác.`);
+      nameInput.focus();
+      return;
+    }
+
     const newWallet = {
       id: generateClientUuid(),
-      user_id: String(userId),
+      user_id: String(currentUserId),
       name: name,
-      opening_balance_vnd: balance, // tên trường theo contract/schema
+      opening_balance_vnd: balance,
       initial_balance_vnd: balance,
       created_at: new Date().toISOString()
     };
 
     await saveAndQueue({
-      user_id: String(userId),
+      user_id: String(currentUserId),
       entity: 'wallet',
       action: 'upsert',
       record: newWallet
@@ -384,6 +496,9 @@ export async function render(container) {
 
     nameInput.value = '';
     balanceInput.value = '0';
+    if (typeof showToast === 'function') {
+      showToast(`Đã thêm ví "${name}" thành công! ✨`);
+    }
     await loadData();
   };
 
