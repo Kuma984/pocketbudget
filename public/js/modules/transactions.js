@@ -1,4 +1,4 @@
-// Thành viên A — Task A03: Màn hình Thu chi & Ví (Giao diện chuẩn Netlify Cute Theme)
+﻿// Thành viên A — Task A03: Màn hình Thu chi & Ví (Giao diện chuẩn Netlify Cute Theme)
 import { CATEGORIES } from '../config.js';
 import { listRecords, saveAndQueue, generateClientUuid, openDatabase } from '../db.js';
 import { showToast } from '../app.js';
@@ -31,7 +31,6 @@ export async function render(container) {
     <section class="card" style="margin-bottom: 20px;">
       <div class="card-header-row">
         <h2><i class="ri-wallet-3-line"></i> Quản lý các Ví & Tổng tài sản</h2>
-        <span class="muted-tag" style="background:var(--primary-light); color:var(--primary); font-weight:700;">Định luật bảo toàn tài sản</span>
       </div>
       
       <div style="margin: 12px 0 16px;">
