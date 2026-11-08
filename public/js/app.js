@@ -462,6 +462,25 @@ export async function ensureDefaultWallets(userId) {
   if (!userId) return;
   try {
     const existing = await listRecords('wallets', String(userId));
+    
+    // Tự động xóa các bản ghi ví trùng lặp trong IndexedDB nếu có
+    const db = await openDatabase();
+    const seenNames = new Map();
+    for (const w of existing) {
+      const norm = (w.name || '').trim().toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+      if (seenNames.has(norm)) {
+        try {
+          const tx = db.transaction(['wallets'], 'readwrite');
+          tx.objectStore('wallets').delete(w.id);
+        } catch {}
+      } else {
+        seenNames.set(norm, w);
+      }
+    }
+
+    const currentExisting = await listRecords('wallets', String(userId));
+    if (currentExisting.length >= 3) return;
+
     const defaults = [
       { key: 'cash', name: '💵 Tiền mặt' },
       { key: 'bank', name: '🏦 Ngân hàng' },
@@ -469,7 +488,7 @@ export async function ensureDefaultWallets(userId) {
     ];
 
     for (const def of defaults) {
-      const exists = existing.some(w => {
+      const exists = currentExisting.some(w => {
         const n = (w.name || '').toLowerCase();
         if (def.key === 'cash') return n.includes('tiền mặt') || n.includes('cash');
         if (def.key === 'bank') return n.includes('ngân hàng') || n.includes('bank');
@@ -506,7 +525,14 @@ async function populateWalletDropdown() {
 
   const userId = currentUser ? currentUser.id : '1';
   await ensureDefaultWallets(userId);
-  let wallets = await listRecords('wallets', userId);
+  let rawWallets = await listRecords('wallets', userId);
+  const seenDropNames = new Set();
+  let wallets = rawWallets.filter(w => {
+    const norm = (w.name || '').trim().toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+    if (seenDropNames.has(norm)) return false;
+    seenDropNames.add(norm);
+    return true;
+  });
 
   if (wallets.length === 0) {
     wallets = [

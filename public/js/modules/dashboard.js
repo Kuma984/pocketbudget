@@ -127,14 +127,25 @@ export async function render(container) {
   await loadAndRenderDashboard();
 
   async function loadAndRenderDashboard() {
-    let wallets = await listRecords('wallets', userId);
+    let rawWallets = await listRecords('wallets', userId);
     let rawTxs = await listRecords('transactions', userId);
+
+    // Deduplicate wallets by normalized name
+    const seenWalletNames = new Set();
+    let wallets = [];
+    for (const w of rawWallets) {
+      const norm = (w.name || '').trim().toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+      if (!seenWalletNames.has(norm) && norm !== '') {
+        seenWalletNames.add(norm);
+        wallets.push(w);
+      }
+    }
 
     if (wallets.length === 0) {
       wallets = [
-        { id: 'wallet_cash', user_id: String(userId), name: 'Ví tiền mặt', initial_balance_vnd: 0 },
-        { id: 'wallet_bank', user_id: String(userId), name: 'Ngân hàng', initial_balance_vnd: 0 },
-        { id: 'wallet_momo', user_id: String(userId), name: 'MoMo', initial_balance_vnd: 0 }
+        { id: 'wallet_cash', user_id: String(userId), name: '💵 Tiền mặt', initial_balance_vnd: 0 },
+        { id: 'wallet_bank', user_id: String(userId), name: '🏦 Ngân hàng', initial_balance_vnd: 0 },
+        { id: 'wallet_momo', user_id: String(userId), name: '💖 Ví MoMo', initial_balance_vnd: 0 }
       ];
     }
 
@@ -290,7 +301,12 @@ export async function render(container) {
     const bar = container.querySelector('#walletBar');
     bar.innerHTML = `<button class="wallet-chip jelly-btn ${activeWalletFilter === 'all' ? 'active' : ''}" data-wallet="all"><i class="ri-grid-fill"></i> Tất cả ví</button>`;
 
+    const seenBarNames = new Set();
     wallets.forEach(w => {
+      const norm = (w.name || '').trim().toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+      if (seenBarNames.has(norm)) return;
+      seenBarNames.add(norm);
+
       const btn = document.createElement('button');
       btn.className = `wallet-chip jelly-btn ${activeWalletFilter === w.name || activeWalletFilter === w.id ? 'active' : ''}`;
       btn.setAttribute('data-wallet', w.name);

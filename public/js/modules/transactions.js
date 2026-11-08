@@ -204,14 +204,21 @@ export async function render(container) {
 
   async function loadData() {
     const userId = getUserId();
-    let wallets = await listRecords('wallets', userId);
+    let rawWallets = await listRecords('wallets', userId);
+    const seenTxWalletNames = new Set();
+    let wallets = rawWallets.filter(w => {
+      const norm = (w.name || '').trim().toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+      if (seenTxWalletNames.has(norm)) return false;
+      seenTxWalletNames.add(norm);
+      return true;
+    });
     let transactions = await listRecords('transactions', userId);
 
     if (wallets.length === 0) {
       wallets = [
-        { id: 'wallet_cash', user_id: String(userId), name: 'Ví tiền mặt', initial_balance_vnd: 0 },
-        { id: 'wallet_bank', user_id: String(userId), name: 'Ngân hàng', initial_balance_vnd: 0 },
-        { id: 'wallet_momo', user_id: String(userId), name: 'MoMo', initial_balance_vnd: 0 }
+        { id: 'wallet_cash', user_id: String(userId), name: '💵 Tiền mặt', initial_balance_vnd: 0 },
+        { id: 'wallet_bank', user_id: String(userId), name: '🏦 Ngân hàng', initial_balance_vnd: 0 },
+        { id: 'wallet_momo', user_id: String(userId), name: '💖 Ví MoMo', initial_balance_vnd: 0 }
       ];
     }
 
