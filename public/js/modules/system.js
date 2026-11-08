@@ -33,7 +33,7 @@ export async function render(container) {
 
   container.innerHTML = `
     <section class="card" style="margin-bottom: 20px;">
-      <h2><i class="ri-shield-user-line"></i> Xác thực Tài khoản (Thành viên A — A01)</h2>
+      <h2><i class="ri-shield-user-line"></i> Xác thực Tài khoản</h2>
       <p class="section-desc">Hệ thống hỗ trợ làm việc Ngoại tuyến (Offline-First) và Đăng nhập để đồng bộ đám mây.</p>
 
       ${currentUser ? `
@@ -85,7 +85,7 @@ export async function render(container) {
 
     <!-- Trạng thái Hệ thống & Đồng bộ Máy chủ (Đã ẩn theo yêu cầu) -->
     <section class="card" style="display: none; margin-bottom: 20px;">
-      <h2><i class="ri-server-line"></i> Kiểm tra Máy chủ Backend & Đồng bộ (A02, A04)</h2>
+      <h2><i class="ri-server-line"></i> Kiểm tra Máy chủ Backend & Đồng bộ</h2>
       <p class="section-desc">Kiểm tra kết nối PHP/MySQL Backend, Ollama AI và hàng đợi đồng bộ chống trùng lặp (Idempotency).</p>
 
       <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:16px;">

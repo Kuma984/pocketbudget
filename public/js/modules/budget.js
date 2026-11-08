@@ -19,7 +19,7 @@ export async function render(container) {
   container.innerHTML = `
     <div class="budget-screen">
       <section class="card" style="margin-bottom:20px;">
-        <h2><i class="ri-money-dollar-circle-line"></i> Cài đặt & Quản lý Ngân sách Tháng (B02)</h2>
+        <h2><i class="ri-money-dollar-circle-line"></i> Cài đặt & Quản lý Ngân sách Tháng</h2>
         <p class="section-desc">Thiết lập hạn mức chi tiêu để kiểm soát tài chính sinh viên thông minh và nhận cảnh báo khi bội chi.</p>
 
         <div style="background:var(--bg); border:1px solid var(--line-strong); padding:18px; border-radius:var(--radius-sm);">
@@ -89,10 +89,18 @@ export async function render(container) {
         .filter(t => t.type === 'expense' && (t.occurred_on || t.date || '').startsWith(m))
         .reduce((sum, t) => sum + Number(t.amount_vnd || t.amount || 0), 0);
 
-      const isOver = limit > 0 && spent > limit;
-      const statusBadge = isOver
-        ? '<span style="background:#fee2e2; color:#b91c1c; padding:3px 8px; border-radius:12px; font-size:12px; font-weight:600;">Vượt mức!</span>'
-        : '<span style="background:#dcfce7; color:#15803d; padding:3px 8px; border-radius:12px; font-size:12px; font-weight:600;">Trong tầm kiểm soát</span>';
+      const ratio = limit > 0 ? (spent / limit) : 0;
+      const percent = Math.round(ratio * 100);
+
+      let statusBadge = '';
+      if (ratio > 1) {
+        statusBadge = `<span style="background:#fee2e2; color:#b91c1c; padding:3px 8px; border-radius:12px; font-size:12px; font-weight:600;">Vượt mức (${percent}%)</span>`;
+      } else if (ratio >= 0.8) {
+        statusBadge = `<span style="background:#fef3c7; color:#b45309; padding:3px 8px; border-radius:12px; font-size:12px; font-weight:600;">Cảnh báo (${percent}%)</span>`;
+      } else {
+        statusBadge = `<span style="background:#dcfce7; color:#15803d; padding:3px 8px; border-radius:12px; font-size:12px; font-weight:600;">Trong tầm kiểm soát (${percent}%)</span>`;
+      }
+      const isOver = ratio > 1;
 
       tbody.innerHTML += `
         <tr style="border-bottom:1px solid #eee;">
