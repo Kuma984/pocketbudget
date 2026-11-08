@@ -25,6 +25,7 @@ const routes = { dashboard, transactions, budget, simulation, wishlist, chat, sy
 document.addEventListener('DOMContentLoaded', async () => {
   createFallingCoinsAndWallets();
   await fetchCurrentUser();
+  await ensureDefaultWallets(currentUser ? currentUser.id : '1');
 
   // Ẩn Splash Screen sau 1.8s
   setTimeout(() => {
@@ -374,19 +375,61 @@ function saveMonthlyBudget() {
 // ==========================================
 // 7. CAMERA NỔI & AI OCR QUÉT HÓA ĐƠN
 // ==========================================
+export async function ensureDefaultWallets(userId) {
+  if (!userId) return;
+  try {
+    const existing = await listRecords('wallets', String(userId));
+    const defaults = [
+      { key: 'cash', name: '💵 Tiền mặt' },
+      { key: 'bank', name: '🏦 Ngân hàng' },
+      { key: 'momo', name: '💖 Ví MoMo' }
+    ];
+
+    for (const def of defaults) {
+      const exists = existing.some(w => {
+        const n = (w.name || '').toLowerCase();
+        if (def.key === 'cash') return n.includes('tiền mặt') || n.includes('cash');
+        if (def.key === 'bank') return n.includes('ngân hàng') || n.includes('bank');
+        if (def.key === 'momo') return n.includes('momo') || n.includes('ví điện tử');
+        return false;
+      });
+
+      if (!exists) {
+        const newWallet = {
+          id: generateClientUuid(),
+          user_id: String(userId),
+          name: def.name,
+          opening_balance_vnd: 0,
+          initial_balance_vnd: 0,
+          created_at: new Date().toISOString()
+        };
+        await saveAndQueue({
+          user_id: String(userId),
+          entity: 'wallet',
+          action: 'upsert',
+          record: newWallet
+        });
+      }
+    }
+  } catch (err) {
+    console.warn('ensureDefaultWallets error:', err);
+  }
+}
+
 async function populateWalletDropdown() {
   const select = document.getElementById('photoWallet');
   if (!select) return;
   select.innerHTML = '';
 
   const userId = currentUser ? currentUser.id : '1';
+  await ensureDefaultWallets(userId);
   let wallets = await listRecords('wallets', userId);
 
   if (wallets.length === 0) {
     wallets = [
       { id: 'wallet_cash', name: '💵 Tiền mặt' },
       { id: 'wallet_bank', name: '🏦 Ngân hàng' },
-      { id: 'wallet_momo', name: '💖 MoMo' }
+      { id: 'wallet_momo', name: '💖 Ví MoMo' }
     ];
   }
 

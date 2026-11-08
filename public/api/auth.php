@@ -40,10 +40,11 @@ if ($action === 'register') {
     $stmt->execute([$name, $email, $hash]);
     $userId = (int)$pdo->lastInsertId();
 
-    // Tạo sẵn 1 chiếc ví "Tiền mặt" cho người dùng mới
-    $walletId = simple_uuid();
+    // Tạo sẵn 3 chiếc ví mặc định (Tiền mặt, Ngân hàng, Ví MoMo) cho người dùng mới
     $stmtWallet = $pdo->prepare('INSERT INTO wallets (id, user_id, name, opening_balance_vnd, version) VALUES (?, ?, ?, ?, 1)');
-    $stmtWallet->execute([$walletId, $userId, 'Tiền mặt', 0]);
+    $stmtWallet->execute([simple_uuid(), $userId, '💵 Tiền mặt', 0]);
+    $stmtWallet->execute([simple_uuid(), $userId, '🏦 Ngân hàng', 0]);
+    $stmtWallet->execute([simple_uuid(), $userId, '💖 Ví MoMo', 0]);
 
     // Lưu phiên đăng nhập
     session_regenerate_id(true);
