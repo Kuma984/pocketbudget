@@ -98,3 +98,47 @@
 @media (prefers-reduced-motion: reduce) {
   .c-btn, .c-sample { transition: none; }
 }
+
+/* Trợ lý AI: hội thoại nhiều lượt */
+.c-log {
+  display: flex; flex-direction: column; gap: 10px; margin: 4px 0 14px; padding: 12px;
+  max-height: min(60vh, 520px); overflow-y: auto; overscroll-behavior: contain;
+  background: var(--bg); border: 1.5px solid var(--line-strong); border-radius: var(--radius-sm);
+}
+.c-log:empty::before {
+  content: "Chào bạn! Hỏi về số dư theo sổ, tổng thu/chi, ngân sách còn lại, hoặc thử một khoản mua.";
+  color: var(--muted); font-size: 0.88rem;
+}
+.c-msg {
+  max-width: min(88%, 560px); padding: 10px 12px; border-radius: 14px; font-size: 0.9rem; line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.c-msg p { margin: 0; }
+.c-msg p + p, .c-msg p + .c-msg-list, .c-msg-list + p { margin-top: 6px; }
+.c-msg-user { align-self: flex-end; background: var(--text); color: #fff; border-bottom-right-radius: 4px; white-space: pre-wrap; }
+.c-msg-bot { align-self: flex-start; background: var(--surface); color: var(--text); border: 1.5px solid var(--line-strong); border-bottom-left-radius: 4px; }
+.c-msg-error { border-color: rgba(185, 28, 28, 0.35); background: #fff1f2; }
+.c-msg-error > p:first-child { color: #b91c1c; }
+.c-msg-warn { border-color: rgba(245, 158, 11, 0.45); }
+.c-msg-list { margin: 0; padding-left: 18px; }
+.c-msg-note { font-size: 0.78rem; color: var(--muted); }
+.c-typing { color: var(--muted); font-style: italic; }
+.c-msg .c-quick { margin-top: 8px; }
+.c-msg .c-btn { min-height: 38px; padding: 8px 12px; font-size: 0.82rem; width: auto; margin-top: 8px; }
+.c-msg .c-quick .c-btn { margin-top: 0; }
+.c-msg .c-entry { margin-top: 8px; background: var(--bg); }
+.c-quick { display: flex; flex-wrap: wrap; gap: 8px; }
+.c-chip {
+  font: inherit; font-size: 0.82rem; font-weight: 700; min-height: 38px; padding: 7px 14px; cursor: pointer;
+  border-radius: 99px; border: 1.5px solid var(--line-strong); background: var(--surface); color: var(--text);
+}
+.c-chip:hover, .c-chip:focus-visible { border-color: var(--primary); color: #047857; outline: none; }
+.c-chip:disabled { opacity: 0.55; cursor: not-allowed; }
+.c-module > .c-quick { margin: 0 0 12px; }
+details.c-guide > summary { cursor: pointer; font-weight: 700; font-size: 0.95rem; color: var(--text); }
+details.c-guide[open] > summary { margin-bottom: 10px; }
+.c-chat-form .c-field textarea { min-height: 52px; }
+@media (max-width: 480px) {
+  .c-msg { max-width: 94%; }
+  .c-log { padding: 10px; }
+}

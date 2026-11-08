@@ -40,6 +40,11 @@ function readAppCachedUser() {
     return /^[1-9][0-9]{0,19}$/.test(id) ? { id, name: cached.name ?? '', email: cached.email ?? '' } : null;
   } catch { return null; }
 }
+/** User mà app đang dùng trên máy (null sau khi đăng xuất). Chat dùng để xóa ngữ cảnh khi đổi tài khoản. */
+export function currentAppUserId() {
+  return readAppCachedUser()?.id ?? null;
+}
+
 function offlineSession() {
   const cached = readAppCachedUser();
   if (!cached) {
@@ -60,6 +65,8 @@ export async function getCSession() {
   try {
     const result = setCSession(await apiRequest('auth.php?action=me'));
     if (!result) throw new Error('Chưa xác định được tài khoản. Hãy đăng nhập.');
+    // Giữ user đã lưu trên máy khớp với máy chủ (app.js cũng ghi khóa này sau khi đăng nhập).
+    try { localStorage.setItem(APP_USER_KEY, JSON.stringify(result.user)); } catch { /* Không có localStorage. */ }
     return result;
   } catch (error) {
     if (error instanceof TypeError) {

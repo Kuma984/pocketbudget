@@ -38,7 +38,7 @@ function worker({ available = [], network = async () => { throw new Error('offli
 test('first install includes the integrated PWA and C dependencies', async () => {
   const instance = worker();
   await instance.install();
-  for (const asset of ['./index.html', './css/layout.css', './css/components.css', './css/member-c.css', './js/modules/c-context.js', './js/modules/c-tools.js', './js/modules/chat.js', './js/modules/c-draft.js']) {
+  for (const asset of ['./index.html', './css/layout.css', './css/components.css', './css/member-c.css', './js/modules/c-context.js', './js/modules/c-tools.js', './js/modules/chat.js', './js/modules/chat-answers.js', './js/modules/c-draft.js']) {
     assert.ok(instance.cached.includes(asset), asset);
   }
   assert.equal(instance.cached.some(file => file.startsWith('./api/')), false);

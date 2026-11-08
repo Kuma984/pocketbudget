@@ -142,10 +142,18 @@ Full snapshot đủ để nhóm kiểm thử dataset cá nhân nhỏ, không ph�
 ## Chatbot local
 PWA → API có session + CSRF → model Ollama local. Chỉ API backend biết URL model; client không tùy ý truyền URL để server fetch.
 
-Intent whitelist:
-- expense_summary: period/category; code tính số liệu, model diễn giải.
+Intent whitelist (AI nhận diện câu hỏi; app tính mọi con số trong `public/js/modules/chat-answers.js` bằng `domain/finance.js`):
+- balance: số dư theo sổ PocketBudget. wallet_scope all/named/unclear, wallet_name khi hỏi một ví, as_of current/past. Hỏi số dư quá khứ thì app báo chưa tính được, không trả số dư hiện tại. Không phải số dư ngân hàng thật.
+- expense_summary / income_summary: period (this_month, last_month, YYYY-MM) và category_code đúng loại; thiếu kỳ thì app hỏi lại.
+- budget_remaining: period; ngân sách còn lại = hạn mức tháng − tổng chi tháng (getMonthBudgetStatus).
+- clarify_remaining: câu "còn bao nhiêu" mơ hồ; app hỏi lại số dư hay ngân sách.
 - simulate_purchase: item_name/price_vnd; mở công cụ mô phỏng, không save.
 - draft_transaction: fields giao dịch; thiếu gì hỏi bổ sung; người dùng xác nhận bằng luồng thu chi chung.
+- unsupported: ngoài phạm vi; app nói rõ và gợi ý câu phù hợp.
+
+Hội thoại nhiều lượt: client gửi `context.history` tối đa 3 lượt `{message, result}`; result là kết quả phân loại đã qua kiểm tra, không có số tiền từ sổ. Server kiểm tra lại từng result bằng `pb_ai_history`. Ngữ cảnh chỉ nằm trong bộ nhớ tab, bị xóa khi bấm "Cuộc trò chuyện mới", đăng xuất hoặc đổi tài khoản.
+
+Không có đường dự phòng đoán bằng từ khóa: Ollama không trả lời thì API trả 503 (AI_UNAVAILABLE, AI_MODEL_MISSING) hoặc 504 (AI_TIMEOUT) và giao diện giữ câu hỏi để thử lại.
 
 Mẫu trả draft (chỉ ví dụ, không model response giả):
 ```json

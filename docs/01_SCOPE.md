@@ -23,7 +23,7 @@ PocketBudget ưu tiên ghi sổ được ngay, xem số liệu từ dữ liệu 
 | M05 | Sync | Push operations, pull snapshot, retry idempotent, xóa và 401/409 rõ |
 | M06 | Mô phỏng mua | Trước/sau cho số dư, ngân sách, mức chia đều/ngày; không ghi sổ ngầm |
 | M07 | Wishlist | Lưu tên, giá, ngày xem lại, trạng thái; “đã mua” tạo draft và xác nhận |
-| M08 | Chatbot local hẹp | 3 intent: expense_summary, simulate_purchase, draft_transaction; validate và fallback |
+| M08 | Chatbot local hẹp | Intent: balance, expense_summary, income_summary, budget_remaining, simulate_purchase, draft_transaction (+ hỏi lại khi mơ hồ); validate; Ollama lỗi thì báo thật |
 
 M01–M05 là nền. M06 là điểm sáng tạo chính. M07–M08 ghép sau nền và không được làm hỏng nhập thủ công. Nếu thiếu thời gian, ưu tiên hoàn thiện M06 và ít intent chat nhưng chạy thật thay vì chat nhiều tính năng giả.
 

@@ -3,6 +3,16 @@ declare(strict_types=1);
 
 const PB_AI_INCOME = ['allowance', 'salary', 'scholarship', 'other_income'];
 const PB_AI_EXPENSE = ['food', 'transport', 'study', 'shopping', 'entertainment', 'health', 'other_expense'];
+const PB_AI_INTENTS = ['balance', 'expense_summary', 'income_summary', 'budget_remaining', 'clarify_remaining',
+    'simulate_purchase', 'draft_transaction', 'unsupported'];
+
+function pb_ai_period(mixed $value): string
+{
+    if (!is_string($value) || !preg_match('/^(this_month|last_month|[1-9][0-9]{3}-(0[1-9]|1[0-2]))$/D', $value)) {
+        throw new InvalidArgumentException('Invalid period.');
+    }
+    return $value;
+}
 
 function pb_ai_object(mixed $value): array
 {
@@ -57,21 +67,41 @@ function pb_ai_enum(mixed $value, array $choices): string
 function pb_ai_result(mixed $raw): array
 {
     $data = pb_ai_object($raw);
-    $intent = pb_ai_enum($data['intent'] ?? null, ['expense_summary', 'simulate_purchase', 'draft_transaction', 'unsupported']);
+    $intent = pb_ai_enum($data['intent'] ?? null, PB_AI_INTENTS);
     $result = ['intent' => $intent];
     switch ($intent) {
+        case 'balance':
+            // Số dư theo sổ: app tự tính. Model chỉ cho biết phạm vi ví và có phải hỏi thời điểm quá khứ không.
+            pb_ai_keys($data, ['intent', 'wallet_scope', 'wallet_name', 'as_of']);
+            $scope = array_key_exists('wallet_scope', $data) ? pb_ai_enum($data['wallet_scope'], ['all', 'named', 'unclear']) : 'all';
+            $name = array_key_exists('wallet_name', $data) ? pb_ai_text($data['wallet_name'], 60, true) : '';
+            if ($scope === 'named' && $name === '') {
+                $scope = 'unclear';
+            }
+            $result['wallet_scope'] = $scope;
+            if ($scope === 'named') {
+                $result['wallet_name'] = $name;
+            }
+            $result['as_of'] = array_key_exists('as_of', $data) ? pb_ai_enum($data['as_of'], ['current', 'past']) : 'current';
+            break;
         case 'expense_summary':
+        case 'income_summary':
             pb_ai_keys($data, ['intent', 'period', 'category_code']);
             if (array_key_exists('period', $data)) {
-                if (!is_string($data['period']) ||
-                    !preg_match('/^(this_month|last_month|[1-9][0-9]{3}-(0[1-9]|1[0-2]))$/D', $data['period'])) {
-                    throw new InvalidArgumentException('Invalid period.');
-                }
-                $result['period'] = $data['period'];
+                $result['period'] = pb_ai_period($data['period']);
             }
             if (array_key_exists('category_code', $data)) {
-                $result['category_code'] = pb_ai_enum($data['category_code'], PB_AI_EXPENSE);
+                $result['category_code'] = pb_ai_enum($data['category_code'], $intent === 'income_summary' ? PB_AI_INCOME : PB_AI_EXPENSE);
             }
+            break;
+        case 'budget_remaining':
+            pb_ai_keys($data, ['intent', 'period']);
+            if (array_key_exists('period', $data)) {
+                $result['period'] = pb_ai_period($data['period']);
+            }
+            break;
+        case 'clarify_remaining':
+            pb_ai_keys($data, ['intent']);
             break;
         case 'simulate_purchase':
             pb_ai_keys($data, ['intent', 'item_name', 'price_vnd']);
@@ -116,4 +146,25 @@ function pb_ai_result(mixed $raw): array
             break;
     }
     return $result;
+}
+
+/**
+ * Ngữ cảnh hội thoại gửi kèm để model hiểu câu nối tiếp ("Còn ví Tiền mặt?", "Còn tháng trước?").
+ * Chỉ gồm câu người dùng đã hỏi và kết quả phân loại đã qua kiểm tra; không có số tiền hay dữ liệu sổ.
+ * Mỗi kết quả cũ được kiểm tra lại bằng pb_ai_result, nên client không thể chèn ý định ngoài danh sách.
+ */
+function pb_ai_history(mixed $value): array
+{
+    if (!is_array($value) || count($value) > 3) {
+        throw new InvalidArgumentException('Invalid history.');
+    }
+    $turns = [];
+    foreach ($value as $turn) {
+        $item = pb_ai_object($turn);
+        pb_ai_keys($item, ['message', 'result']);
+        $result = pb_ai_result($item['result'] ?? null);
+        unset($result['missing_fields']);
+        $turns[] = ['message' => pb_ai_text($item['message'] ?? null, 500), 'result' => $result];
+    }
+    return $turns;
 }
