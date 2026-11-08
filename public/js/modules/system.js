@@ -83,8 +83,8 @@ export async function render(container) {
       `}
     </section>
 
-    <!-- Trạng thái Hệ thống & Đồng bộ Máy chủ -->
-    <section class="card" style="margin-bottom: 20px;">
+    <!-- Trạng thái Hệ thống & Đồng bộ Máy chủ (Đã ẩn theo yêu cầu) -->
+    <section class="card" style="display: none; margin-bottom: 20px;">
       <h2><i class="ri-server-line"></i> Kiểm tra Máy chủ Backend & Đồng bộ (A02, A04)</h2>
       <p class="section-desc">Kiểm tra kết nối PHP/MySQL Backend, Ollama AI và hàng đợi đồng bộ chống trùng lặp (Idempotency).</p>
 
@@ -183,7 +183,8 @@ export async function render(container) {
   // Health check
   const btnCheckHealth = container.querySelector('#btnCheckHealth');
   const healthResult = container.querySelector('#healthResult');
-  btnCheckHealth.onclick = async () => {
+  if (btnCheckHealth) {
+    btnCheckHealth.onclick = async () => {
     btnCheckHealth.disabled = true;
     healthResult.innerHTML = '<span style="color:var(--muted);"><i class="ri-loader-4-line"></i> Đang kiểm tra...</span>';
     try {
@@ -199,10 +200,12 @@ export async function render(container) {
       btnCheckHealth.disabled = false;
     }
   };
+  }
 
   // Đồng bộ
   const btnSyncNow = container.querySelector('#btnSyncNow');
-  btnSyncNow.onclick = async () => {
+  if (btnSyncNow) {
+    btnSyncNow.onclick = async () => {
     btnSyncNow.disabled = true;
     btnSyncNow.innerHTML = '<i class="ri-loader-4-line"></i> Đang đồng bộ...';
     try {
@@ -216,6 +219,7 @@ export async function render(container) {
       btnSyncNow.innerHTML = '<i class="ri-refresh-line"></i> Đồng bộ đám mây ngay';
     }
   };
+  }
 }
 
 function escapeHtml(str) {
