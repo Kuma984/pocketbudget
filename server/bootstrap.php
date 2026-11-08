@@ -107,7 +107,11 @@ function csrf_token(): string {
 function verify_csrf_token(): void {
     $token = $_SESSION['csrf_token'] ?? '';
     $sent = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
-    if (!is_string($token) || $token === '' || !hash_equals($token, $sent)) {
+    if ($sent === '') {
+        $input = get_json_input();
+        $sent = $input['csrf_token'] ?? $_POST['csrf_token'] ?? '';
+    }
+    if (!is_string($token) || $token === '' || !hash_equals($token, (string)$sent)) {
         json_response(['ok' => false, 'error' => [
             'code' => 'INVALID_CSRF', 'message' => 'Phiên không hợp lệ. Tải lại hoặc đăng nhập lại.',
         ]], 403);

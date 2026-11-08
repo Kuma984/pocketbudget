@@ -121,11 +121,18 @@ export async function render(container) {
   if (btnLogout) {
     btnLogout.onclick = async () => {
       try {
-        await apiRequest('auth.php?action=logout', { method: 'POST', body: { csrf_token: csrfToken } });
-        localStorage.removeItem('student_name');
-        location.reload();
+        await apiRequest('auth.php?action=logout', {
+          method: 'POST',
+          csrfToken: csrfToken,
+          body: { csrf_token: csrfToken }
+        });
       } catch (err) {
-        alert('Lỗi đăng xuất: ' + err.message);
+        console.warn('Lưu ý khi đăng xuất:', err);
+      } finally {
+        localStorage.removeItem('student_name');
+        try { sessionStorage.clear(); } catch {}
+        location.hash = '#dashboard';
+        location.reload();
       }
     };
   }
