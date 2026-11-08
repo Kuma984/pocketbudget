@@ -381,6 +381,7 @@ export async function render(container) {
     } else {
       const modalHeader = document.getElementById('modalHeaderTitle');
       if (modalHeader) modalHeader.innerHTML = `<i class="ri-camera-lens-line"></i> Khoảnh khắc & Chi tiêu ngày ${day}/${month}/${year}`;
+      if (typeof populateWalletDropdown === 'function') populateWalletDropdown();
       const cameraModal = document.getElementById('cameraModal');
       if (cameraModal) cameraModal.classList.add('show');
     }
@@ -420,6 +421,7 @@ export async function render(container) {
       const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
       document.getElementById('selectedDateInput').value = dateStr;
       document.getElementById('modalHeaderTitle').innerHTML = `<i class="ri-camera-lens-line"></i> Thêm giao dịch ngày ${day}/${month}/${year}`;
+      if (typeof populateWalletDropdown === 'function') populateWalletDropdown();
       document.getElementById('cameraModal').classList.add('show');
     };
 

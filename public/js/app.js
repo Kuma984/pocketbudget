@@ -44,6 +44,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   updateTopBarInfo();
   setupEventListeners();
   setupCameraAndOCR();
+  populateWalletDropdown();
   setupJellyButtonSparks();
   registerServiceWorker();
   route();
@@ -518,37 +519,46 @@ export async function ensureDefaultWallets(userId) {
   }
 }
 
-async function populateWalletDropdown() {
+export async function populateWalletDropdown() {
   const select = document.getElementById('photoWallet');
   if (!select) return;
-  select.innerHTML = '';
 
-  const userId = currentUser ? currentUser.id : '1';
-  await ensureDefaultWallets(userId);
-  let rawWallets = await listRecords('wallets', userId);
-  const seenDropNames = new Set();
-  let wallets = rawWallets.filter(w => {
-    const norm = (w.name || '').trim().toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
-    if (seenDropNames.has(norm)) return false;
-    seenDropNames.add(norm);
-    return true;
-  });
+  const defaults = [
+    { id: 'wallet_cash', name: '💵 Tiền mặt' },
+    { id: 'wallet_bank', name: '🏦 Ngân hàng' },
+    { id: 'wallet_momo', name: '💖 Ví MoMo' }
+  ];
 
-  if (wallets.length === 0) {
-    wallets = [
-      { id: 'wallet_cash', name: '💵 Tiền mặt' },
-      { id: 'wallet_bank', name: '🏦 Ngân hàng' },
-      { id: 'wallet_momo', name: '💖 Ví MoMo' }
-    ];
+  let wallets = [];
+  try {
+    const userId = currentUser ? currentUser.id : '1';
+    let rawWallets = await listRecords('wallets', userId);
+    const seenDropNames = new Set();
+    wallets = (rawWallets || []).filter(w => {
+      const norm = (w.name || '').trim().toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+      if (seenDropNames.has(norm) || !norm) return false;
+      seenDropNames.add(norm);
+      return true;
+    });
+  } catch (err) {
+    console.warn('populateWalletDropdown error:', err);
   }
 
+  if (!wallets || wallets.length === 0) {
+    wallets = defaults;
+  }
+
+  const fragment = document.createDocumentFragment();
   wallets.forEach(w => {
     const opt = document.createElement('option');
     opt.value = w.id;
     opt.textContent = w.name;
     opt.setAttribute('data-name', w.name);
-    select.appendChild(opt);
+    fragment.appendChild(opt);
   });
+
+  select.innerHTML = '';
+  select.appendChild(fragment);
 }
 
 function setupCameraAndOCR() {
