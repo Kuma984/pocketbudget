@@ -50,11 +50,11 @@ export async function render(container) {
             <form id="formLogin" class="form">
               <div class="field">
                 <label>Email đăng nhập</label>
-                <input type="email" id="loginEmail" placeholder="nguyenvana@gmail.com" required value="demo@pocketbudget.local">
+                <input type="email" id="loginEmail" placeholder="nguyenvana@gmail.com" required>
               </div>
               <div class="field">
                 <label>Mật khẩu</label>
-                <input type="password" id="loginPassword" placeholder="pocketbudget123" required value="pocketbudget123">
+                <input type="password" id="loginPassword" placeholder="Nhập mật khẩu..." required>
               </div>
               <button type="submit" class="primary"><i class="ri-login-circle-line"></i> Đăng nhập ngay</button>
             </form>
