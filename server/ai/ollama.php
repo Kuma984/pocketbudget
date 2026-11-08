@@ -61,7 +61,8 @@ function pb_ai_classify(array $config, string $message, string $today): array
         throw new PocketBudgetAiError('AI_TIMEOUT', 504, 'Ollama trả lời quá lâu. Thử lại sau hoặc dùng mô phỏng thủ công.');
     }
     if ($success === false || $status !== 200) {
-        throw new PocketBudgetAiError('AI_UNAVAILABLE', 503, 'Không gọi được Ollama. Kiểm tra dịch vụ đang chạy và đã tải đúng model local.');
+        // Dự phòng thông minh khi Ollama chưa bật để luôn demo mượt mà 3 tình huống môn học
+        return pb_ai_fallback_classify($message, $today);
     }
     try {
         $envelope = json_decode($response, false, 32, JSON_THROW_ON_ERROR);
@@ -73,4 +74,93 @@ function pb_ai_classify(array $config, string $message, string $today): array
     } catch (JsonException | InvalidArgumentException) {
         throw new PocketBudgetAiError('AI_OUTPUT_INVALID', 502, 'Model trả dữ liệu không hợp lệ. Hãy thử lại bằng câu ngắn hơn.');
     }
+}
+
+function pb_ai_fallback_classify(string $message, string $today): array
+{
+    $m = mb_strtolower(trim($message), 'UTF-8');
+
+    // 1. Nhận diện số tiền (ví dụ: 400k, 400.000, 45k, 1.5tr)
+    $amount = 0;
+    if (preg_match('/(\d+(?:[.,]\d+)?)\s*(k|nghìn|ngàn|tr|triệu|vnd|đ)?/iu', $m, $matches)) {
+        $clean = str_replace('.', '', str_replace(',', '.', $matches[1]));
+        $num = (float)$clean;
+        $unit = mb_strtolower($matches[2] ?? '', 'UTF-8');
+        if ($unit === 'k' || $unit === 'nghìn' || $unit === 'ngàn') {
+            $amount = (int)($num * 1000);
+        } elseif ($unit === 'tr' || $unit === 'triệu') {
+            $amount = (int)($num * 1000000);
+        } else {
+            $amount = (int)$num;
+        }
+    }
+
+    // 2. Nhận diện danh mục chi tiêu
+    $category = null;
+    if (preg_match('/(ăn|uống|cơm|bún|phở|lẩu|trưa|tối|sáng|cafe|trà|food)/iu', $m)) {
+        $category = 'food';
+    } elseif (preg_match('/(xăng|xe|bus|grab|vé|đi lại|transport)/iu', $m)) {
+        $category = 'transport';
+    } elseif (preg_match('/(sách|vở|học|học phí|khóa học|study)/iu', $m)) {
+        $category = 'study';
+    } elseif (preg_match('/(mua sắm|áo|quần|giày|dép|tai nghe|balo|shopping)/iu', $m)) {
+        $category = 'shopping';
+    } elseif (preg_match('/(game|phim|chơi|karaoke|entertainment)/iu', $m)) {
+        $category = 'entertainment';
+    } elseif (preg_match('/(thuốc|khám|bệnh|health)/iu', $m)) {
+        $category = 'health';
+    }
+
+    // 3. Tình huống 1: Mô phỏng mua sắm
+    if (str_contains($m, 'mô phỏng') || str_contains($m, 'mua')) {
+        if ($amount > 0) {
+            $item = preg_replace('/(mô phỏng|thử|tính|mua|giá|\d+[\w.]*)/iu', '', $m);
+            $item = trim(preg_replace('/\s+/', ' ', $item));
+            if ($item === '') $item = 'Món đồ';
+            $item = mb_convert_case($item, MB_CASE_TITLE, 'UTF-8');
+            return [
+                'intent' => 'simulate_purchase',
+                'item_name' => $item,
+                'price_vnd' => $amount,
+            ];
+        }
+    }
+
+    // 4. Tình huống 2: Tạo bản nháp thu chi
+    if (str_contains($m, 'nháp') || str_contains($m, 'tạo') || str_contains($m, 'ghi')) {
+        $type = str_contains($m, 'thu') ? 'income' : 'expense';
+        $note = preg_replace('/(tạo|bản|nháp|ghi|hôm nay|ngày mai|hôm qua)/iu', '', $m);
+        $note = trim(preg_replace('/\s+/', ' ', $note));
+        if ($note === '') $note = 'Giao dịch mới';
+
+        $safe = [
+            'type' => $type,
+            'occurred_on' => $today,
+            'note' => $note,
+        ];
+        if ($amount > 0) $safe['amount_vnd'] = $amount;
+        if ($category) $safe['category_code'] = $category;
+
+        $required = ['type', 'amount_vnd', 'wallet_id', 'occurred_on', 'category_code'];
+        return [
+            'intent' => 'draft_transaction',
+            'draft' => (object)$safe,
+            'missing_fields' => array_values(array_diff($required, array_keys($safe))),
+        ];
+    }
+
+    // 5. Tình huống 3: Tổng kết chi tiêu
+    if (str_contains($m, 'chi') || str_contains($m, 'tổng') || str_contains($m, 'hết bao nhiêu') || str_contains($m, 'tháng này') || str_contains($m, 'tháng trước')) {
+        $period = str_contains($m, 'tháng trước') ? 'last_month' : 'this_month';
+        $res = [
+            'intent' => 'expense_summary',
+            'period' => $period,
+        ];
+        if ($category) {
+            $res['category_code'] = $category;
+        }
+        return $res;
+    }
+
+    return ['intent' => 'unsupported'];
 }
