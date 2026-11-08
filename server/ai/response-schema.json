@@ -3,11 +3,14 @@
   "additionalProperties": false,
   "required": ["intent"],
   "properties": {
-    "intent": {"enum": ["expense_summary", "simulate_purchase", "draft_transaction", "unsupported"]},
+    "intent": {"enum": ["balance", "expense_summary", "income_summary", "budget_remaining", "clarify_remaining", "simulate_purchase", "draft_transaction", "unsupported"]},
+    "wallet_scope": {"enum": ["all", "named", "unclear"]},
+    "wallet_name": {"type": "string", "maxLength": 60},
+    "as_of": {"enum": ["current", "past"]},
     "item_name": {"type": "string", "maxLength": 120},
     "price_vnd": {"type": "integer", "minimum": 1, "maximum": 9007199254740991},
     "period": {"type": "string", "pattern": "^(this_month|last_month|[1-9][0-9]{3}-(0[1-9]|1[0-2]))$"},
-    "category_code": {"type": "string", "enum": ["food", "transport", "study", "shopping", "entertainment", "health", "other_expense"]},
+    "category_code": {"type": "string", "enum": ["allowance", "salary", "scholarship", "other_income", "food", "transport", "study", "shopping", "entertainment", "health", "other_expense"]},
     "draft": {
       "type": "object",
       "additionalProperties": false,
