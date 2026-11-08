@@ -8,6 +8,14 @@ start_session();
 
 $action = $_GET['action'] ?? '';
 $input = get_json_input();
+if (in_array($action, ['register', 'login', 'logout'], true) && ($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+    json_response(['ok' => false, 'error' => ['message' => 'Thao tác này yêu cầu POST.']], 405);
+}
+
+if (in_array($action, ['register', 'login'], true) &&
+    strtolower(trim(explode(';', $_SERVER['CONTENT_TYPE'] ?? '')[0])) !== 'application/json') {
+    json_response(['ok' => false, 'error' => ['message' => 'Yêu cầu dữ liệu JSON.']], 415);
+}
 
 // 1. ĐĂNG KÝ (REGISTER)
 if ($action === 'register') {
@@ -38,13 +46,15 @@ if ($action === 'register') {
     $stmtWallet->execute([$walletId, $userId, 'Tiền mặt', 0]);
 
     // Lưu phiên đăng nhập
+    session_regenerate_id(true);
+    unset($_SESSION['csrf_token']);
     $_SESSION['user_id'] = $userId;
 
     json_response([
         'ok' => true,
         'data' => [
             'user' => ['id' => (string)$userId, 'name' => $name, 'email' => $email],
-            'csrf_token' => 'token-ok'
+            'csrf_token' => csrf_token()
         ]
     ]);
 }
@@ -63,13 +73,15 @@ if ($action === 'login') {
     }
 
     // Lưu ID người dùng vào session
+    session_regenerate_id(true);
+    unset($_SESSION['csrf_token']);
     $_SESSION['user_id'] = (int)$user['id'];
 
     json_response([
         'ok' => true,
         'data' => [
             'user' => ['id' => (string)$user['id'], 'name' => $user['name'], 'email' => $user['email']],
-            'csrf_token' => 'token-ok'
+            'csrf_token' => csrf_token()
         ]
     ]);
 }
@@ -94,13 +106,15 @@ if ($action === 'me') {
         'ok' => true,
         'data' => [
             'user' => ['id' => (string)$user['id'], 'name' => $user['name'], 'email' => $user['email']],
-            'csrf_token' => 'token-ok'
+            'csrf_token' => csrf_token()
         ]
     ]);
 }
 
 // 4. ĐĂNG XUẤT (LOGOUT)
 if ($action === 'logout') {
+    require_login();
+    verify_csrf_token();
     $_SESSION = [];
     session_destroy();
     json_response(['ok' => true, 'data' => null]);

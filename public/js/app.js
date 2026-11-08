@@ -10,7 +10,7 @@ import { render as system } from './modules/system.js';
 
 import { apiRequest } from './api.js';
 import { listRecords, saveAndQueue, generateClientUuid } from './db.js';
-import { syncNow } from './sync.js';
+import { pullSnapshot, syncNow } from './sync.js';
 
 let currentImageData = null;
 let catTimer = null;
@@ -46,6 +46,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupJellyButtonSparks();
   registerServiceWorker();
   route();
+  if (currentUser && navigator.onLine) {
+    try {
+      await pullSnapshot(currentUser.id);
+      route();
+    } catch (error) {
+      if (!(error instanceof TypeError)) showToast('Chưa tải được dữ liệu máy chủ: ' + error.message);
+    }
+  }
 });
 
 // Lấy thông tin user phiên làm việc nếu có

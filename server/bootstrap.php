@@ -4,6 +4,10 @@ declare(strict_types=1);
 // Bắt đầu session nếu chưa có
 function start_session(): void {
     if (session_status() === PHP_SESSION_NONE) {
+        session_set_cookie_params([
+            'httponly' => true, 'samesite' => 'Lax',
+            'secure' => !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off',
+        ]);
         session_start();
     }
 }
@@ -64,6 +68,7 @@ function require_login(): int {
 function json_response(array $data, int $status = 200): void {
     http_response_code($status);
     header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store');
     echo json_encode($data, JSON_UNESCAPED_UNICODE);
     exit;
 }
@@ -92,4 +97,19 @@ function simple_uuid(): string {
 // Tương thích ngược với tên gọi cũ
 function generate_uuid(): string {
     return simple_uuid();
+}
+
+function csrf_token(): string {
+    start_session();
+    return $_SESSION['csrf_token'] ??= bin2hex(random_bytes(32));
+}
+
+function verify_csrf_token(): void {
+    $token = $_SESSION['csrf_token'] ?? '';
+    $sent = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+    if (!is_string($token) || $token === '' || !hash_equals($token, $sent)) {
+        json_response(['ok' => false, 'error' => [
+            'code' => 'INVALID_CSRF', 'message' => 'Phiên không hợp lệ. Tải lại hoặc đăng nhập lại.',
+        ]], 403);
+    }
 }

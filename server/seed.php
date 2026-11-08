@@ -9,6 +9,11 @@ declare(strict_types=1);
 require_once __DIR__ . '/bootstrap.php';
 
 $isCli = (php_sapi_name() === 'cli');
+if (!$isCli) {
+    http_response_code(404);
+    exit;
+}
+date_default_timezone_set('Asia/Ho_Chi_Minh');
 
 function output_line(string $text): void
 {
@@ -40,15 +45,8 @@ $stmt->execute([$demoEmail]);
 $existingUser = $stmt->fetch();
 
 if ($existingUser) {
-    $userId = (int)$existingUser['id'];
-    output_line("[INFO] Người dùng demo đã tồn tại (User ID: {$userId}). Tiến hành làm mới dữ liệu mẫu...");
-    
-    // Dọn dẹp dữ liệu cũ của user demo để tránh trùng lặp
-    $pdo->prepare('DELETE FROM processed_operations WHERE user_id = ?')->execute([$userId]);
-    $pdo->prepare('DELETE FROM wishlist WHERE user_id = ?')->execute([$userId]);
-    $pdo->prepare('DELETE FROM transactions WHERE user_id = ?')->execute([$userId]);
-    $pdo->prepare('DELETE FROM budgets WHERE user_id = ?')->execute([$userId]);
-    $pdo->prepare('DELETE FROM wallets WHERE user_id = ?')->execute([$userId]);
+    output_line('[INFO] Tài khoản demo đã tồn tại. Giữ nguyên dữ liệu hiện có.');
+    exit(0);
 } else {
     $passwordHash = password_hash($demoPassword, PASSWORD_DEFAULT);
     $stmt = $pdo->prepare('INSERT INTO users (name, email, password_hash) VALUES (?, ?, ?)');

@@ -1,0 +1,15 @@
+.c-module { min-width: 0; }
+.c-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px 16px; }
+.c-field { display: flex; flex-direction: column; gap: 3px; font-weight: 600; min-width: 0; }
+.c-field :is(input,select,textarea) { font: inherit; font-weight: 400; border: 1px solid #aac4b7; border-radius: 7px; padding: 7px 9px; width: 100%; min-width: 0; }
+.c-actions { display: flex; flex-wrap: wrap; gap: 8px; grid-column: 1 / -1; }
+.c-table { width: 100%; table-layout: fixed; border-collapse: collapse; margin-top: 16px; }
+.c-table :is(th,td) { border-bottom: 1px solid #d8e3dc; padding: 8px; text-align: left; overflow-wrap: anywhere; }
+.c-error { color: #9b2828; }
+.c-muted { color: #516d62; }
+.c-entry { border: 1px solid #d8e3dc; border-radius: 10px; padding: 14px; margin-top: 12px; overflow-wrap: anywhere; }
+.c-entry h3 { margin: 0; }
+.c-chat-result { overflow-wrap: anywhere; }
+@media(max-width:600px) { .c-grid { grid-template-columns: 1fr; } .c-table :is(th,td) { padding: 5px; font-size: 13px; } }
+
+.c-field[hidden] { display: none; }

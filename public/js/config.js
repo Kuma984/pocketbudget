@@ -6,4 +6,4 @@ export const CATEGORIES = Object.freeze({
 });
 export const WISHLIST_STATUSES = Object.freeze(['considering', 'bought', 'skipped']);
 export const DB_NAME = 'pocketbudget';
-export const DB_VERSION = 1;
+export const DB_VERSION = 2;

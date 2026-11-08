@@ -30,6 +30,7 @@ $wishlist = $stmtWishlist->fetchAll();
 json_response([
     'ok' => true,
     'data' => [
+        'user_id' => (string)$userId,
         'wallets' => $wallets,
         'transactions' => $transactions,
         'budgets' => $budgets,
