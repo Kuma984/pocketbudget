@@ -5,22 +5,25 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Pocket Budget — Cute Cat Meme Edition</title>
   
-  <!-- Google Fonts & Remix Icon -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="PocketBudget">
+  <link rel="apple-touch-icon" href="./icons/icon-192.png">
+
+
+
+  <link rel="stylesheet" href="css/remixicon.css">
   
   <!-- Tesseract.js AI OCR Quét Hóa Đơn -->
-  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <script src="js/tesseract.min.js"></script>
   
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
   <meta name="theme-color" content="#f8fafc">
 
-  <link rel="stylesheet" href="css/layout.css?v=16">
-  <link rel="stylesheet" href="css/components.css?v=16">
-  <link rel="stylesheet" href="css/member-c.css?v=16">
+  <link rel="stylesheet" href="css/layout.css?v=17">
+  <link rel="stylesheet" href="css/components.css?v=17">
+  <link rel="stylesheet" href="css/member-c.css?v=17">
 </head>
 <body>
 
@@ -83,7 +86,7 @@
         COI MÁ NÀY SÀI TIỀN KÌA TRỜI 😭
       </div>
       <div class="cat-img-wrapper">
-        <img id="catAlertImg" src="https://images.unsplash.com/photo-1543852786-1cf6624b9987?w=400" alt="Mèo Meme Chấm Hỏi" class="cat-pop-img">
+        <img id="catAlertImg" src="img/cat-meme.jpg" alt="Mèo Meme Chấm Hỏi" class="cat-pop-img">
         <div class="flying-money-burst" id="catMoneyBurst"></div>
       </div>
     </div>
@@ -212,6 +215,6 @@
   <!-- Hiệu Ứng Mưa Xu Rơi & Tiền Bay -->
   <div class="fx-layer" id="fxLayer"></div>
 
-  <script type="module" src="./js/app.js?v=16"></script>
+  <script type="module" src="./js/app.js?v=17"></script>
 </body>
 </html>

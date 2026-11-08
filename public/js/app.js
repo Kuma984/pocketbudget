@@ -63,8 +63,17 @@ async function fetchCurrentUser() {
     const res = await apiRequest('auth.php?action=me');
     currentUser = res.user;
     csrfToken = res.csrf_token;
+    if (currentUser) {
+      localStorage.setItem('pocketbudget_cached_user', JSON.stringify(currentUser));
+      localStorage.setItem('student_name', currentUser.name);
+    }
   } catch {
-    currentUser = null;
+    const cached = localStorage.getItem('pocketbudget_cached_user');
+    if (cached) {
+      try { currentUser = JSON.parse(cached); } catch { currentUser = null; }
+    } else {
+      currentUser = null;
+    }
     csrfToken = null;
   }
 }

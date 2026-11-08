@@ -1,22 +1,29 @@
 // Cache the shell only. API writes/reads belong to app sync, never fake JSON from HTML.
 const PREFIX = `pocketbudget-shell:${self.registration.scope}:`;
-const CACHE = `${PREFIX}v16`;
+const CACHE = `${PREFIX}v17`;
+
 const ASSETS = [
   "./",
   "./index.html",
+  "./manifest.webmanifest",
   "./css/styles.css",
   "./css/layout.css",
   "./css/components.css",
   "./css/member-c.css",
-  "./manifest.webmanifest",
+  "./css/remixicon.css",
+  "./css/remixicon.woff2",
+  "./css/remixicon.woff",
+  "./css/remixicon.ttf",
   "./icons/icon.svg",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
+  "./img/cat-meme.jpg",
   "./js/config.js",
   "./js/api.js",
   "./js/db.js",
   "./js/sync.js",
   "./js/app.js",
+  "./js/tesseract.min.js",
   "./js/modules/dashboard.js",
   "./js/modules/transactions.js",
   "./js/modules/budget.js",
@@ -29,29 +36,79 @@ const ASSETS = [
   "./js/modules/system.js",
   "./js/domain/finance.js"
 ];
-const ASSET_URLS = new Set(ASSETS.map(path => new URL(path, self.registration.scope).href));
+
+// Clean path set for fast lookup regardless of query parameters (e.g. ?v=17)
+const CLEAN_ASSET_PATHS = new Set(
+  ASSETS.map(path => {
+    const u = new URL(path, self.registration.scope);
+    return u.pathname;
+  })
+);
+
 self.addEventListener('install', event => {
   self.skipWaiting();
-  event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)));
+  event.waitUntil(
+    caches.open(CACHE).then(cache => {
+      return Promise.allSettled(
+        ASSETS.map(asset => cache.add(asset).catch(err => console.warn(`Cache add failed: ${asset}`, err)))
+      );
+    })
+  );
 });
+
 self.addEventListener('activate', event => {
   event.waitUntil((async () => {
     const keys = await caches.keys();
-    await Promise.all(keys.filter(key => key.startsWith(PREFIX) && key !== CACHE).map(key => caches.delete(key)));
+    await Promise.all(
+      keys
+        .filter(key => key.startsWith(PREFIX) && key !== CACHE)
+        .map(key => caches.delete(key))
+    );
     await self.clients.claim();
   })());
 });
+
 self.addEventListener('fetch', event => {
   const request = event.request;
   const url = new URL(request.url);
   const apiPath = new URL('./api/', self.registration.scope).pathname;
-  if (request.method !== 'GET' || url.origin !== self.location.origin || url.pathname.startsWith(apiPath)) return;
-  if (request.mode === 'navigate') {
-    event.respondWith(fetch(request).catch(() => caches.open(CACHE).then(cache => cache.match('./index.html'))));
+
+  // Don't intercept non-GET or API calls
+  if (request.method !== 'GET' || url.origin !== self.location.origin || url.pathname.startsWith(apiPath)) {
     return;
   }
-  if (ASSET_URLS.has(url.href)) {
-    event.respondWith(caches.open(CACHE).then(cache => cache.match(request)).then(hit => hit || fetch(request)));
+
+  // Navigation requests: Network-first with Cache fallback to ./index.html
+  if (request.mode === 'navigate') {
+    event.respondWith(
+      fetch(request)
+        .then(response => {
+          const clone = response.clone();
+          caches.open(CACHE).then(cache => cache.put('./index.html', clone));
+          return response;
+        })
+        .catch(() => caches.open(CACHE).then(cache => cache.match('./index.html') || cache.match('./')))
+    );
+    return;
+  }
+
+  // Static assets: Cache-First with ignoreSearch for query strings like ?v=17
+  if (CLEAN_ASSET_PATHS.has(url.pathname)) {
+    event.respondWith(
+      caches.open(CACHE).then(async cache => {
+        const cached = await cache.match(request, { ignoreSearch: true });
+        if (cached) return cached;
+
+        const fallbackCached = await cache.match(url.pathname);
+        if (fallbackCached) return fallbackCached;
+
+        return fetch(request).then(response => {
+          if (response && response.status === 200) {
+            cache.put(request, response.clone());
+          }
+          return response;
+        });
+      })
+    );
   }
 });
-// B03: bump cache version/update ASSETS after changing modules; never clear IndexedDB here.

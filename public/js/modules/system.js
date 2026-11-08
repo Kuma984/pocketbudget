@@ -130,6 +130,7 @@ export async function render(container) {
         console.warn('Lưu ý khi đăng xuất:', err);
       } finally {
         localStorage.removeItem('student_name');
+        localStorage.removeItem('pocketbudget_cached_user');
         try { sessionStorage.clear(); } catch {}
         location.hash = '#dashboard';
         location.reload();
@@ -150,6 +151,7 @@ export async function render(container) {
           body: { email, password }
         });
         localStorage.setItem('student_name', res.user.name);
+        localStorage.setItem('pocketbudget_cached_user', JSON.stringify(res.user));
         alert(`Chào mừng ${res.user.name}! Đăng nhập thành công.`);
         location.reload();
       } catch (err) {
@@ -172,6 +174,7 @@ export async function render(container) {
           body: { name, email, password }
         });
         localStorage.setItem('student_name', res.user.name);
+        localStorage.setItem('pocketbudget_cached_user', JSON.stringify(res.user));
         alert(`Đăng ký thành công tài khoản ${res.user.name}!`);
         location.reload();
       } catch (err) {

@@ -165,6 +165,7 @@ export async function render(container) {
     try {
       const res = await apiRequest('auth.php?action=me');
       currentUser = res.user;
+      if (currentUser) localStorage.setItem('pocketbudget_cached_user', JSON.stringify(currentUser));
       authBox.innerHTML = `
         <div style="background:var(--primary-light); border:1px solid rgba(16,185,129,0.3); padding:12px 16px; border-radius:var(--radius-sm); display:flex; justify-content:space-between; align-items:center;">
           <span>Đang đăng nhập: <strong>${escapeHtml(currentUser.name)}</strong> (${escapeHtml(currentUser.email)})</span>
@@ -172,13 +173,28 @@ export async function render(container) {
         </div>
       `;
     } catch {
-      currentUser = null;
-      authBox.innerHTML = `
-        <div style="background:var(--bg); border:1px solid var(--line-strong); padding:12px 16px; border-radius:var(--radius-sm); display:flex; justify-content:space-between; align-items:center;">
-          <span>Chế độ: <strong>Ngoại tuyến (Offline-First)</strong></span>
-          <a href="#system" class="status-pill-btn" style="text-decoration:none;"><i class="ri-login-box-line"></i> Đăng nhập</a>
-        </div>
-      `;
+      const cached = localStorage.getItem('pocketbudget_cached_user');
+      if (cached) {
+        try { currentUser = JSON.parse(cached); } catch { currentUser = null; }
+      } else {
+        currentUser = null;
+      }
+
+      if (currentUser) {
+        authBox.innerHTML = `
+          <div style="background:var(--primary-light); border:1px solid rgba(16,185,129,0.3); padding:12px 16px; border-radius:var(--radius-sm); display:flex; justify-content:space-between; align-items:center;">
+            <span>Người dùng: <strong>${escapeHtml(currentUser.name)}</strong> (Offline)</span>
+            <span class="status-pill" data-state="offline"><i class="ri-wifi-off-line"></i> Ngoại tuyến</span>
+          </div>
+        `;
+      } else {
+        authBox.innerHTML = `
+          <div style="background:var(--bg); border:1px solid var(--line-strong); padding:12px 16px; border-radius:var(--radius-sm); display:flex; justify-content:space-between; align-items:center;">
+            <span>Chế độ: <strong>Ngoại tuyến (Offline-First)</strong></span>
+            <a href="#system" class="status-pill-btn" style="text-decoration:none;"><i class="ri-login-box-line"></i> Đăng nhập</a>
+          </div>
+        `;
+      }
     }
   }
 

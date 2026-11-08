@@ -3,23 +3,30 @@
   "name": "PocketBudget — Cute Cat Meme Edition",
   "short_name": "PocketBudget",
   "lang": "vi",
-  "start_url": "./",
+  "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
+  "orientation": "portrait-primary",
   "background_color": "#f8fafc",
   "theme_color": "#10b981",
+  "description": "Quản lý chi tiêu sinh viên thông minh Offline-First",
   "icons": [
     {
       "src": "./icons/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any"
+      "purpose": "any maskable"
     },
     {
       "src": "./icons/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any"
+      "purpose": "any maskable"
+    },
+    {
+      "src": "./icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
     }
   ]
 }

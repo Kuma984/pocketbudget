@@ -12,8 +12,14 @@ export async function render(container) {
   try {
     const res = await apiRequest('auth.php?action=me');
     currentUser = res.user;
+    if (currentUser) localStorage.setItem('pocketbudget_cached_user', JSON.stringify(currentUser));
   } catch {
-    currentUser = null;
+    const cached = localStorage.getItem('pocketbudget_cached_user');
+    if (cached) {
+      try { currentUser = JSON.parse(cached); } catch { currentUser = null; }
+    } else {
+      currentUser = null;
+    }
   }
   const userId = currentUser ? currentUser.id : '1';
 
