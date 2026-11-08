@@ -1,35 +1,15 @@
 // System & Backend Sync Module (Thành viên A)
 import { apiRequest } from '../api.js';
 import { syncNow } from '../sync.js';
-import { listRecords, openDatabase } from '../db.js';
+import { clearCSession, getAppSession, GUEST_USER_ID, setCSession } from './c-context.js';
+import { listRecords } from '../db.js';
 
 export async function render(container) {
-  let currentUser = null;
-  let csrfToken = null;
-  try {
-    const res = await apiRequest('auth.php?action=me');
-    currentUser = res.user;
-    csrfToken = res.csrf_token;
-  } catch {
-    currentUser = null;
-  }
-
-  const userId = currentUser ? currentUser.id : '1';
-
-  // Đếm hàng đợi outbox offline
-  let pendingCount = 0;
-  try {
-    const db = await openDatabase();
-    const tx = db.transaction(['outbox'], 'readonly');
-    const store = tx.objectStore('outbox');
-    const req = store.getAll();
-    req.onsuccess = () => {
-      pendingCount = (req.result || []).length;
-      updateOutboxCount(pendingCount);
-    };
-  } catch {
-    pendingCount = 0;
-  }
+  const session = await getAppSession();
+  const currentUser = session?.user;
+  const userId = currentUser?.id ?? GUEST_USER_ID;
+  const pending = await listRecords('outbox', userId).catch(() => null);
+  if (!container.isConnected) return;
 
   container.innerHTML = `
     <section class="card" style="margin-bottom: 20px;">
@@ -116,12 +96,16 @@ export async function render(container) {
     }
   }
 
+  if (pending) updateOutboxCount(pending.length);
+  else container.querySelector('#outboxCountBadge').textContent = 'Không đọc được';
+
   // Đăng xuất
   const btnLogout = container.querySelector('#btnLogout');
   if (btnLogout) {
     btnLogout.onclick = async () => {
       try {
-        await apiRequest('auth.php?action=logout', { method: 'POST', body: { csrf_token: csrfToken } });
+        await apiRequest('auth.php?action=logout', { method: 'POST', csrfToken: (await getAppSession())?.csrf_token });
+        clearCSession();
         localStorage.removeItem('student_name');
         location.reload();
       } catch (err) {
@@ -142,6 +126,7 @@ export async function render(container) {
           method: 'POST',
           body: { email, password }
         });
+        setCSession(res);
         localStorage.setItem('student_name', res.user.name);
         alert(`Chào mừng ${res.user.name}! Đăng nhập thành công.`);
         location.reload();
@@ -164,6 +149,7 @@ export async function render(container) {
           method: 'POST',
           body: { name, email, password }
         });
+        setCSession(res);
         localStorage.setItem('student_name', res.user.name);
         alert(`Đăng ký thành công tài khoản ${res.user.name}!`);
         location.reload();
@@ -199,7 +185,8 @@ export async function render(container) {
     btnSyncNow.disabled = true;
     btnSyncNow.innerHTML = '<i class="ri-loader-4-line"></i> Đang đồng bộ...';
     try {
-      const res = await syncNow(userId, csrfToken);
+      if (!currentUser) throw new Error('Đăng nhập trước khi đồng bộ.');
+      const res = await syncNow(userId);
       alert(`Đồng bộ hoàn tất!\n- Đã gửi lên máy chủ: ${res.pushed || 0} mục\n- Đã kéo về: ${res.pulled || 0} mục`);
       location.hash = '#dashboard';
     } catch (err) {

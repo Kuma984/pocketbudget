@@ -1,17 +1,11 @@
 // Ghép nối Module Ngân Sách (Thành viên B — B02) với IndexedDB & Đồng bộ
 import { listRecords, saveAndQueue, generateClientUuid } from '../db.js';
 import { formatVND } from '../domain/finance.js';
-import { apiRequest } from '../api.js';
+import { getAppSession, GUEST_USER_ID } from './c-context.js';
 
 export async function render(container) {
-  let currentUser = null;
-  try {
-    const res = await apiRequest('auth.php?action=me');
-    currentUser = res.user;
-  } catch {
-    currentUser = null;
-  }
-  const userId = currentUser ? currentUser.id : '1';
+  const userId = (await getAppSession())?.user.id ?? GUEST_USER_ID;
+  if (!container.isConnected) return;
 
   const today = new Date();
   const currentMonthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
@@ -111,7 +105,7 @@ export async function render(container) {
     const limit = parseInt(container.querySelector('#budget-limit-input').value, 10);
     const msg = container.querySelector('#budget-msg');
 
-    if (!limit || limit <= 0) {
+    if (!Number.isSafeInteger(limit) || limit <= 0) {
       alert('Vui lòng nhập hạn mức hợp lệ.');
       return;
     }
@@ -135,7 +129,6 @@ export async function render(container) {
         base_version: existing ? (existing.version || 0) : 0
       });
 
-      localStorage.setItem('user_monthly_budget', limit);
       msg.innerHTML = '<span style="color:#15803d;">Đã lưu ngân sách và đưa vào hàng chờ đồng bộ thành công!</span>';
       await loadBudgetInfo();
       setTimeout(() => { msg.innerHTML = ''; }, 3000);

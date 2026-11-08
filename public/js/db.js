@@ -60,13 +60,14 @@ export async function listRecords(storeName, userId) {
       resolve(records.filter(r => !r.deleted_at));
     };
     req.onerror = () => reject(req.error);
+    tx.oncomplete = tx.onabort = () => db.close();
   });
 }
 
 /**
  * Lưu thay đổi thực thể và hàng đợi outbox nguyên tử trong một transaction IndexedDB.
  */
-export async function saveAndQueue({ user_id, entity, action, record, base_version = 0 }) {
+export async function saveAndQueue({ user_id, entity, action, record, base_version }) {
   if (!user_id) throw new Error('user_id là bắt buộc.');
   if (!entity || !action || !record) throw new Error('Thiếu tham số bắt buộc cho saveAndQueue.');
 
@@ -75,113 +76,48 @@ export async function saveAndQueue({ user_id, entity, action, record, base_versi
   const operationId = generateClientUuid();
 
   return new Promise((resolve, reject) => {
-    const tx = db.transaction([storeName, 'outbox'], 'readwrite');
+    const tx = db.transaction([storeName, 'outbox', 'meta'], 'readwrite');
     const entityStore = tx.objectStore(storeName);
     const outboxStore = tx.objectStore('outbox');
 
-    // 1. Chuẩn bị bản ghi thực thể
-    const updatedRecord = {
-      ...record,
-      user_id: String(user_id),
-      sync_status: 'pending',
-      version: record.version || (base_version > 0 ? base_version : 1),
-    };
-
-    if (action === 'delete') {
-      updatedRecord.deleted_at = new Date().toISOString();
-    }
-
-    entityStore.put(updatedRecord);
-
-    // 2. Chuẩn bị thao tác outbox
-    const op = {
-      id: operationId,
-      operation_id: operationId,
-      user_id: String(user_id),
-      entity,
-      action,
-      entity_id: record.id,
-      base_version,
-      record: { ...record },
-      created_at: new Date().toISOString(),
-    };
-
-    outboxStore.put(op);
-
-    tx.oncomplete = () => resolve({ operation_id: operationId, record: updatedRecord });
-    tx.onerror = () => reject(tx.error);
-    tx.onabort = () => reject(tx.error || new Error('Giao dịch IndexedDB bị hủy.'));
-  });
-}
-
-/**
- * Đọc tất cả các thao tác đang chờ trong outbox của một user
- */
-export async function getOutboxOperations(userId) {
-  const db = await openDatabase();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(['outbox'], 'readonly');
-    const store = tx.objectStore('outbox');
-    const index = store.index('user_id');
-    const req = index.getAll(IDBKeyRange.only(String(userId)));
-    req.onsuccess = () => resolve(req.result || []);
-    req.onerror = () => reject(req.error);
-  });
-}
-
-/**
- * Xóa các thao tác đã được máy chủ xác nhận (ACK) khỏi outbox
- */
-export async function clearOutboxOperations(userId, opIds) {
-  if (!opIds || opIds.length === 0) return;
-  const db = await openDatabase();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(['outbox'], 'readwrite');
-    const store = tx.objectStore('outbox');
-    opIds.forEach(id => store.delete(id));
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
-}
-
-/**
- * Trộn dữ liệu snapshot từ server về IndexedDB mà không đè lên các bản ghi đang pending sửa
- */
-export async function mergeSnapshotData(userId, snapshot) {
-  const db = await openDatabase();
-  const stores = ['wallets', 'transactions', 'budgets', 'wishlist'];
-  
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction([...stores, 'outbox'], 'readwrite');
-    const outboxStore = tx.objectStore('outbox');
-    const outboxReq = outboxStore.index('user_id').getAll(IDBKeyRange.only(String(userId)));
-
-    outboxReq.onsuccess = () => {
-      const pendingOps = outboxReq.result || [];
-      const pendingEntityIds = new Set(pendingOps.map(op => op.entity_id));
-
-      for (const entityKey of ['wallets', 'transactions', 'budgets', 'wishlist']) {
-        const storeName = getStoreNameForEntity(entityKey);
-        const store = tx.objectStore(storeName);
-        const items = snapshot[entityKey] || [];
-
-        for (const item of items) {
-          // Nếu item đang có thay đổi chờ đồng bộ ở outbox, giữ lại bản local
-          if (pendingEntityIds.has(item.id)) {
-            continue;
-          }
-
-          const localRecord = {
-            ...item,
-            user_id: String(userId),
-            sync_status: 'synced',
-          };
-          store.put(localRecord);
-        }
+    const owner = String(user_id);
+    let updatedRecord;
+    let writeError;
+    const lookup = entityStore.get(record.id);
+    lookup.onsuccess = () => {
+      const previous = lookup.result;
+      if (previous && previous.user_id !== owner) {
+        writeError = new Error('Bản ghi không thuộc tài khoản đang dùng.');
+        tx.abort();
+        return;
       }
+      const baseVersion = base_version ?? previous?.version ?? 0;
+      updatedRecord = {
+        ...previous,
+        ...record,
+        user_id: owner,
+        sync_status: 'pending',
+        version: baseVersion || 1,
+        deleted_at: action === 'delete' ? new Date().toISOString() : null,
+      };
+      entityStore.put(updatedRecord);
+      const op = {
+        id: operationId, operation_id: operationId, user_id: owner, entity, action,
+        entity_id: record.id, base_version: baseVersion,
+        record: { ...record }, created_at: new Date().toISOString(),
+      };
+      const meta = tx.objectStore('meta');
+      const counterKey = 'queue-order:' + owner;
+      const counter = meta.get(counterKey);
+      counter.onsuccess = () => {
+        op.queue_order = (counter.result?.value ?? 0) + 1;
+        meta.put({ id: counterKey, value: op.queue_order });
+        outboxStore.put(op);
+      };
     };
 
-    tx.oncomplete = () => resolve();
+    tx.oncomplete = () => { db.close(); resolve({ operation_id: operationId, record: updatedRecord }); };
     tx.onerror = () => reject(tx.error);
+    tx.onabort = () => { db.close(); reject(writeError || tx.error || new Error('Giao dịch IndexedDB bị hủy.')); };
   });
 }

@@ -8,14 +8,15 @@ import { render as wishlist } from './modules/wishlist.js';
 import { render as chat } from './modules/chat.js';
 import { render as system } from './modules/system.js';
 
-import { apiRequest } from './api.js';
-import { listRecords, saveAndQueue, generateClientUuid, openDatabase } from './db.js';
-import { syncNow } from './sync.js';
+import { listRecords, saveAndQueue, generateClientUuid } from './db.js';
+import { pullSnapshot, syncNow } from './sync.js';
+import { getAppSession, GUEST_USER_ID } from './modules/c-context.js';
+import { todayLocal } from './modules/c-tools.js';
 
 let currentImageData = null;
 let catTimer = null;
 let currentUser = null;
-let csrfToken = null;
+
 
 const routes = { dashboard, transactions, budget, simulation, wishlist, chat, system };
 
@@ -30,18 +31,19 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupCameraAndOCR();
   registerServiceWorker();
   route();
+  if (currentUser && navigator.onLine) {
+    try {
+      await pullSnapshot(currentUser.id);
+      route();
+    } catch (error) {
+      if (!(error instanceof TypeError)) showToast('Chưa tải được dữ liệu máy chủ: ' + error.message);
+    }
+  }
 });
 
 // Lấy thông tin user phiên làm việc nếu có
 async function fetchCurrentUser() {
-  try {
-    const res = await apiRequest('auth.php?action=me');
-    currentUser = res.user;
-    csrfToken = res.csrf_token;
-  } catch {
-    currentUser = null;
-    csrfToken = null;
-  }
+  currentUser = (await getAppSession())?.user ?? null;
 }
 
 // ==========================================
@@ -86,10 +88,10 @@ async function updateTopBarInfo() {
   if (streakEl) streakEl.textContent = streak;
 
   // Cập nhật trạng thái chi tiêu hôm nay
-  const userId = currentUser ? currentUser.id : '1';
+  const userId = currentUser?.id ?? GUEST_USER_ID;
   try {
     const txs = await listRecords('transactions', userId);
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = todayLocal();
     let todayExp = 0;
     txs.forEach(t => {
       const isExpense = t.type === 'expense';
@@ -124,7 +126,12 @@ function route() {
   const container = document.getElementById('content');
   if (container) {
     container.innerHTML = '';
-    routes[name](container);
+    // An older async render must not paint over a newer route.
+    const page = document.createElement('div');
+    container.append(page);
+    Promise.resolve(routes[name](page)).catch(error => {
+      if (page.isConnected) page.textContent = error.message;
+    });
   }
 
   document.querySelectorAll('nav.app-nav a').forEach(a => {
@@ -145,6 +152,7 @@ function updateNetworkStatus() {
   const netEl = document.getElementById('network');
   if (!netEl) return;
   if (navigator.onLine) {
+    netEl.style.background = netEl.style.color = '';
     netEl.setAttribute('data-state', 'online');
     netEl.innerHTML = '<i class="ri-wifi-line"></i> Online';
   } else {
@@ -181,8 +189,11 @@ export function closeCatAlert() {
 // ==========================================
 // 5. MODAL ĐẶT NGÂN SÁCH THÁNG
 // ==========================================
-function openBudgetModal() {
-  const current = Number(localStorage.getItem('user_monthly_budget')) || 3000000;
+async function openBudgetModal() {
+  const userId = currentUser?.id ?? GUEST_USER_ID;
+  const month = todayLocal().slice(0, 7);
+  const budget = (await listRecords('budgets', userId)).find(b => b.month === month);
+  const current = budget?.limit_vnd ?? '';
   const input = document.getElementById('monthlyBudgetInput');
   if (input) input.value = current;
   const modal = document.getElementById('budgetModal');
@@ -194,17 +205,19 @@ function closeBudgetModal() {
   if (modal) modal.classList.remove('show');
 }
 
-function saveMonthlyBudget() {
-  const input = document.getElementById('monthlyBudgetInput');
-  const val = Number(input.value);
-  if (val && val > 0) {
-    localStorage.setItem('user_monthly_budget', val);
+async function saveMonthlyBudget() {
+  const val = Number(document.getElementById('monthlyBudgetInput').value);
+  if (!Number.isSafeInteger(val) || val <= 0) return showToast('Nhập hạn mức nguyên dương.');
+  const userId = currentUser?.id ?? GUEST_USER_ID;
+  const month = todayLocal().slice(0, 7);
+  try {
+    const budget = (await listRecords('budgets', userId)).find(b => b.month === month);
+    await saveAndQueue({ user_id: userId, entity: 'budget', action: 'upsert',
+      record: { id: budget?.id ?? generateClientUuid(), month, limit_vnd: val } });
     closeBudgetModal();
-    showToast('Đã cập nhật ngân sách tháng thành công!');
+    showToast('Đã lưu ngân sách trên thiết bị.');
     route();
-  } else {
-    alert('Vui lòng nhập số tiền ngân sách hợp lệ (> 0 VNĐ)');
-  }
+  } catch (error) { showToast(error.message); }
 }
 
 // ==========================================
@@ -215,16 +228,8 @@ async function populateWalletDropdown() {
   if (!select) return;
   select.innerHTML = '';
 
-  const userId = currentUser ? currentUser.id : '1';
-  let wallets = await listRecords('wallets', userId);
-
-  if (wallets.length === 0) {
-    wallets = [
-      { id: 'wallet_cash', name: 'Ví tiền mặt' },
-      { id: 'wallet_bank', name: 'Ngân hàng' },
-      { id: 'wallet_momo', name: 'MoMo' }
-    ];
-  }
+  const userId = currentUser?.id ?? GUEST_USER_ID;
+  const wallets = await listRecords('wallets', userId);
 
   wallets.forEach(w => {
     const opt = document.createElement('option');
@@ -336,21 +341,24 @@ function setupCameraAndOCR() {
       const walletName = walletSelect.selectedOptions[0]?.textContent || 'Ví tiền mặt';
       const customDate = document.getElementById('selectedDateInput').value;
 
-      const dateStr = customDate || new Date().toISOString().split('T')[0];
+      const dateStr = customDate || todayLocal();
       const isoDate = new Date(dateStr + 'T12:00:00').toISOString();
 
-      const userId = currentUser ? currentUser.id : '1';
+      const userId = currentUser?.id ?? GUEST_USER_ID;
 
       // Mã hóa category theo danh mục Member A
       const catMap = {
         'Ăn uống': 'food',
         'Học tập': 'study',
         'Xe cộ': 'transport',
-        'Nhà ở': 'housing',
+        'Nhà ở': 'other_expense',
         'Giải trí': 'entertainment',
         'Thu nhập': 'salary'
       };
-      const categoryCode = catMap[categoryName] || 'food';
+      const categoryCode = type === 'income' ? 'other_income' :
+        (categoryName === 'Thu nhập' ? 'other_expense' : (catMap[categoryName] || 'food'));
+      if (!walletId) return showToast('Tạo hoặc đồng bộ ví ở màn Thu chi trước.');
+      if (!Number.isSafeInteger(amount) || amount <= 0) return showToast('Nhập số tiền nguyên dương.');
 
       // Tạo transaction record tương thích song song cả Thành viên A & Thành viên B
       const txRecord = {
@@ -373,12 +381,9 @@ function setupCameraAndOCR() {
         updated_at: new Date().toISOString()
       };
 
-      await saveAndQueue({
-        user_id: String(userId),
-        entity: 'transaction',
-        action: 'upsert',
-        record: txRecord
-      });
+      try {
+        await saveAndQueue({ user_id: userId, entity: 'transaction', action: 'upsert', record: txRecord });
+      } catch (error) { return showToast(error.message); }
 
       closeCameraModal();
       showToast('Đã lưu khoảnh khắc & chi tiêu!');
@@ -416,7 +421,7 @@ function setupEventListeners() {
   if (btnCloseCat) btnCloseCat.onclick = closeCatAlert;
 
   const btnOpenBudget = document.getElementById('btnOpenBudgetModal');
-  if (btnOpenBudget) btnOpenBudget.onclick = openBudgetModal;
+  if (btnOpenBudget) btnOpenBudget.onclick = () => void openBudgetModal().catch(error => showToast(error.message));
 
   const btnCloseBudget = document.getElementById('closeBudgetBtn');
   if (btnCloseBudget) btnCloseBudget.onclick = closeBudgetModal;
@@ -439,8 +444,8 @@ function setupEventListeners() {
       btnSyncHeader.disabled = true;
       if (syncStatusHeader) syncStatusHeader.textContent = 'Đang đồng bộ...';
       try {
-        const userId = currentUser ? currentUser.id : '1';
-        const res = await syncNow(userId, csrfToken);
+        if (!currentUser) throw new Error('Đăng nhập trước khi đồng bộ.');
+        const res = await syncNow(currentUser.id);
         showToast(`Đã đồng bộ máy chủ! Đẩy: ${res.pushed || 0}, Nhận: ${res.pulled || 0}`);
         route();
       } catch (err) {

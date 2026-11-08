@@ -13,7 +13,7 @@ try {
     $dbConnected = true;
 } catch (Throwable $e) {
     $dbConnected = false;
-    $dbError = $e->getMessage();
+    $dbError = 'Chưa kết nối được MySQL. Kiểm tra cấu hình local.';
 }
 
 $aiConfig = $config['ollama'] ?? [];
@@ -23,7 +23,7 @@ $aiConnected = false;
 $aiError = null;
 $availableModels = [];
 
-if ($baseUrl !== '') {
+if ($baseUrl !== '' && function_exists('curl_init')) {
     $ch = curl_init($baseUrl . '/tags');
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,

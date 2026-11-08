@@ -1,7 +1,8 @@
 // Dashboard Module - Netlify Cute Cat Meme Edition (Thành viên B) tích hợp với Đồng bộ & IndexedDB (Thành viên A)
-import { listRecords, saveAndQueue, openDatabase } from '../db.js';
-import { calculateWalletBalances, calculateTotalBalance, formatVND } from '../domain/finance.js';
-import { apiRequest } from '../api.js';
+import { listRecords, saveAndQueue } from '../db.js';
+import { calculateTotalBalance, formatVND, getMonthTotals } from '../domain/finance.js';
+import { getAppSession, GUEST_USER_ID } from './c-context.js';
+import { todayLocal } from './c-tools.js';
 
 let activeWalletFilter = 'all';
 let currentViewYear = new Date().getFullYear();
@@ -9,14 +10,8 @@ let currentViewMonth = new Date().getMonth(); // 0-11
 
 export async function render(container) {
   // Lấy user đăng nhập nếu có
-  let currentUser = null;
-  try {
-    const res = await apiRequest('auth.php?action=me');
-    currentUser = res.user;
-  } catch {
-    currentUser = null;
-  }
-  const userId = currentUser ? currentUser.id : '1';
+  const userId = (await getAppSession())?.user.id ?? GUEST_USER_ID;
+  if (!container.isConnected) return;
 
   container.innerHTML = `
     <!-- Thẻ Ngân Sách & Số Dư (Hero) -->
@@ -142,12 +137,12 @@ export async function render(container) {
       : allTxs.filter(t => t.wallet === activeWalletFilter || t.wallet_id === activeWalletFilter);
 
     // Tính toán số dư tổng tài sản theo chuẩn tài chính Member A
-    const walletBalances = calculateWalletBalances(wallets, allTxs);
-    let totalBalance = 0;
-    Object.values(walletBalances).forEach(b => { totalBalance += b; });
+    const totalBalance = calculateTotalBalance(wallets, rawTxs);
 
     // Đọc ngân sách tháng
-    const monthlyBudget = Number(localStorage.getItem('user_monthly_budget')) || 3000000;
+    const month = todayLocal().slice(0, 7);
+    const monthlyBudget = (await listRecords('budgets', userId)).find(b => b.month === month)?.limit_vnd;
+    if (!container.isConnected) return;
 
     let income = 0;
     let expense = 0;
@@ -166,11 +161,11 @@ export async function render(container) {
       }
     });
 
-    const remainingBudget = monthlyBudget - expense;
+    const remainingBudget = monthlyBudget == null ? null : monthlyBudget - getMonthTotals(rawTxs, month).expense_vnd;
 
     // Render thông tin trên Hero
     container.querySelector('#totalBalance').textContent = formatVND(totalBalance);
-    container.querySelector('#totalRemaining').textContent = formatVND(remainingBudget);
+    container.querySelector('#totalRemaining').textContent = remainingBudget === null ? 'Chưa đặt hạn mức' : formatVND(remainingBudget);
     container.querySelector('#totalIncome').textContent = formatVND(income);
     container.querySelector('#totalExpenseChip').textContent = formatVND(expense);
 
@@ -188,10 +183,10 @@ export async function render(container) {
 
     // Tính toán ngân sách mỗi ngày
     const now = new Date();
-    const daysInMonth = new Date(currentViewYear, currentViewMonth + 1, 0).getDate();
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
     const remainingDays = Math.max(1, daysInMonth - now.getDate() + 1);
-    const dailyBudget = Math.max(0, Math.round(remainingBudget / remainingDays));
-    container.querySelector('#dailyBudget').textContent = `${formatVND(dailyBudget)}/ngày (${remainingDays} ngày còn lại)`;
+    const dailyBudget = Math.floor(remainingBudget / remainingDays);
+    container.querySelector('#dailyBudget').textContent = remainingBudget === null ? '—' : `${formatVND(dailyBudget)}/ngày (${remainingDays} ngày còn lại)`;
 
     // Tiêu đề tháng
     const monthNames = ['Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5', 'Tháng 6', 'Tháng 7', 'Tháng 8', 'Tháng 9', 'Tháng 10', 'Tháng 11', 'Tháng 12'];
@@ -237,7 +232,7 @@ export async function render(container) {
     const grid = container.querySelector('#calendarGrid');
     grid.innerHTML = '';
 
-    const daysInMonth = new Date(currentViewYear, currentViewMonth + 1, 0).getDate();
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
     const now = new Date();
 
     const txMap = {};

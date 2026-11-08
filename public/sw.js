@@ -1,10 +1,11 @@
 // Cache the shell only. API writes/reads belong to app sync, never fake JSON from HTML.
 const PREFIX = `pocketbudget-shell:${self.registration.scope}:`;
-const CACHE = `${PREFIX}v3`;
+const CACHE = `${PREFIX}v4`;
 const ASSETS = [
   "./",
   "./index.html",
   "./css/styles.css",
+  "./css/member-c.css",
   "./css/layout.css",
   "./css/components.css",
   "./manifest.webmanifest",
@@ -22,6 +23,9 @@ const ASSETS = [
   "./js/modules/simulation.js",
   "./js/modules/wishlist.js",
   "./js/modules/chat.js",
+  "./js/modules/c-context.js",
+  "./js/modules/c-draft.js",
+  "./js/modules/c-tools.js",
   "./js/modules/system.js",
   "./js/domain/finance.js"
 ];

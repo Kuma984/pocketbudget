@@ -1,3 +1,4 @@
+import { calculateWalletBalances, calculateTotalBalance } from '../public/js/domain/finance.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { getMonthTotals, simulatePurchase, isValidAmount } from '../public/js/domain/finance.js';
@@ -58,7 +59,6 @@ test('wallet balances and total balance calculate correctly with transfer invari
   // w1 = 200,000 - 50,000 + 300,000 = 450,000
   // w2 = 1,000,000 + 500,000 - 300,000 = 1,200,000
   // Tổng = 450,000 + 1,200,000 = 1,650,000 (không đổi!)
-  const { calculateWalletBalances, calculateTotalBalance } = await import('../public/js/domain/finance.js');
   const balances = calculateWalletBalances(wallets, txs);
   assert.equal(balances.get('w1'), 450000);
   assert.equal(balances.get('w2'), 1200000);

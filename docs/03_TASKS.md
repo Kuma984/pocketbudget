@@ -42,13 +42,13 @@ Report/thuyết trình B: Manifest, Service Worker, App Shell, IndexedDB, cache,
 ## C — Mô phỏng, wishlist, local chatbot
 | Task | Việc làm và file chính | Dependency | Tiêu chí xong | Status |
 | --- | --- | --- | --- | --- |
-| C01 | simulation.js nối domain/finance.js; form giá/ngày/reserved | G0 hoặc fixtures ghi rõ | Trước/sau đúng; không đổi ledger; có tình huống ngân sách âm | todo |
-| C02 | wishlist.js tạo/sửa/status/review date qua db.js | B01,C01 | Reload giữ được; đến ngày hiện khi mở app | todo |
-| C03 | Nối “đã mua” vào draft chuẩn, lưu qua luồng A/B | A03,B01,C02 | Không tạo giao dịch chỉ vì mô phỏng; xác nhận một lần | todo |
-| C04 | Thử local model tiếng Việt, ghi tên/tag/setup và thời gian đo thật | Máy có Ollama | Chạy sau tải model, không dùng model cloud ngoài ý muốn | todo |
-| C05 | server/ai, api/chat.php: auth/CSRF, whitelist intents/schema, timeout | A02,C04 | Ít nhất 3 tình huống chuẩn; thiếu trường hỏi lại; model lỗi báo thật | done |
-| C06 | chat.js: UI, draft preview, mở simulation, context as_of/pending | C01,C05,B01 | Draft không tự lưu; số liệu dùng code; offline UI không treo | todo |
-| C07 | README phần AI + bộ câu hỏi demo/giới hạn | C05,C06 | Bạn khác cấu hình được, không cần đoán model/URL | todo |
+| C01 | simulation.js nối domain/finance.js; form giá/ngày/reserved | G0 hoặc fixtures ghi rõ | Trước/sau đúng; không đổi ledger; có tình huống ngân sách âm | review |
+| C02 | wishlist.js tạo/sửa/status/review date qua db.js | B01,C01 | Reload giữ được; đến ngày hiện khi mở app | review |
+| C03 | Nối “đã mua” vào draft chuẩn, lưu qua luồng A/B | A03,B01,C02 | Không tạo giao dịch chỉ vì mô phỏng; xác nhận một lần | review |
+| C04 | Thử local model tiếng Việt, ghi tên/tag/setup và thời gian đo thật | Máy có Ollama | Chạy sau tải model, không dùng model cloud ngoài ý muốn | doing |
+| C05 | server/ai, api/chat.php: auth/CSRF, whitelist intents/schema, timeout | A02,C04 | Ít nhất 3 tình huống chuẩn; thiếu trường hỏi lại; model lỗi báo thật | review |
+| C06 | chat.js: UI, draft preview, mở simulation, context as_of/pending | C01,C05,B01 | Draft không tự lưu; số liệu dùng code; offline UI không treo | review |
+| C07 | README phần AI + bộ câu hỏi demo/giới hạn | C05,C06 | Bạn khác cấu hình được, không cần đoán model/URL | review |
 
 Report/thuyết trình C: điểm sáng tạo, before/after, wishlist, local AI và giới hạn kết nối. C review số liệu simulation cùng B.
 
@@ -69,3 +69,5 @@ Report/thuyết trình C: điểm sáng tạo, before/after, wishlist, local AI 
 
 ## Lịch nhận việc ngắn
 Mỗi buổi ghi 3 dòng vào handoff: đã xong gì / đang vướng gì / người tiếp theo cần làm gì. Không yêu cầu ceremony dài; không cần 48h timeline khi chưa có deadline thật.
+
+Bản ghép của C lấy `feat/integrated-pwa` tại `f2176a5` làm nền. Xem [cách chạy và checklist review](06_INTEGRATED_DEMO.md). Trạng thái review nghĩa là đã ghép code, còn chờ kiểm thử với PHP/MySQL/Ollama thật.

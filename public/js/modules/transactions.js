@@ -2,12 +2,12 @@
 import { CATEGORIES } from '../config.js';
 import { listRecords, saveAndQueue, generateClientUuid } from '../db.js';
 import { calculateWalletBalances, calculateTotalBalance, formatVND } from '../domain/finance.js';
-import { apiRequest } from '../api.js';
-
-let currentUser = null;
-let editingId = null;
+import { getAppSession, GUEST_USER_ID } from './c-context.js';
+import { todayLocal } from './c-tools.js';
 
 export async function render(container) {
+  let currentUser = null;
+  let editingId = null;
   container.innerHTML = `
     <!-- Khung tài khoản & trạng thái -->
     <div id="auth-box" style="margin-bottom: 16px;"></div>
@@ -78,7 +78,7 @@ export async function render(container) {
         <div class="grid-2">
           <div class="field">
             <label>Số tiền (VNĐ)</label>
-            <input type="number" id="tx-amount" placeholder="Nhập số tiền" required min="1000" step="1000">
+            <input type="number" id="tx-amount" placeholder="Nhập số tiền" required min="1" step="1">
           </div>
 
           <div class="field">
@@ -127,18 +127,18 @@ export async function render(container) {
   `;
 
   // Thiết lập ngày mặc định
-  const today = new Date().toISOString().split('T')[0];
-  document.getElementById('tx-date').value = today;
+  const today = todayLocal();
+  container.querySelector('#' + 'tx-date').value = today;
 
-  const authBox = document.getElementById('auth-box');
-  const typeSelect = document.getElementById('tx-type');
-  const walletSelect = document.getElementById('tx-wallet');
-  const destWalletSelect = document.getElementById('tx-dest-wallet');
-  const catSelect = document.getElementById('tx-category');
-  const boxDestWallet = document.getElementById('box-dest-wallet');
-  const boxCategory = document.getElementById('box-category');
-  const form = document.getElementById('tx-form');
-  const btnCancel = document.getElementById('btn-cancel-edit');
+  const authBox = container.querySelector('#' + 'auth-box');
+  const typeSelect = container.querySelector('#' + 'tx-type');
+  const walletSelect = container.querySelector('#' + 'tx-wallet');
+  const destWalletSelect = container.querySelector('#' + 'tx-dest-wallet');
+  const catSelect = container.querySelector('#' + 'tx-category');
+  const boxDestWallet = container.querySelector('#' + 'box-dest-wallet');
+  const boxCategory = container.querySelector('#' + 'box-category');
+  const form = container.querySelector('#' + 'tx-form');
+  const btnCancel = container.querySelector('#' + 'btn-cancel-edit');
 
   await checkAuth();
   await loadData();
@@ -148,17 +148,16 @@ export async function render(container) {
   };
 
   async function checkAuth() {
-    try {
-      const res = await apiRequest('auth.php?action=me');
-      currentUser = res.user;
+    const session = await getAppSession();
+    currentUser = session?.user ?? null;
+    if (currentUser) {
       authBox.innerHTML = `
         <div style="background:var(--primary-light); border:1px solid rgba(16,185,129,0.3); padding:12px 16px; border-radius:var(--radius-sm); display:flex; justify-content:space-between; align-items:center;">
           <span>Đang đăng nhập: <strong>${escapeHtml(currentUser.name)}</strong> (${escapeHtml(currentUser.email)})</span>
           <span class="status-pill" data-state="online"><i class="ri-cloud-line"></i> Đã kết nối Auth</span>
         </div>
       `;
-    } catch {
-      currentUser = null;
+    } else {
       authBox.innerHTML = `
         <div style="background:var(--bg); border:1px solid var(--line-strong); padding:12px 16px; border-radius:var(--radius-sm); display:flex; justify-content:space-between; align-items:center;">
           <span>Chế độ: <strong>Ngoại tuyến (Offline-First)</strong></span>
@@ -169,21 +168,14 @@ export async function render(container) {
   }
 
   function getUserId() {
-    return currentUser ? currentUser.id : '1';
+    return currentUser?.id ?? GUEST_USER_ID;
   }
 
   async function loadData() {
     const userId = getUserId();
-    let wallets = await listRecords('wallets', userId);
+    const wallets = await listRecords('wallets', userId);
     let transactions = await listRecords('transactions', userId);
 
-    if (wallets.length === 0) {
-      wallets = [
-        { id: 'wallet_cash', user_id: String(userId), name: 'Ví tiền mặt', initial_balance_vnd: 0 },
-        { id: 'wallet_bank', user_id: String(userId), name: 'Ngân hàng', initial_balance_vnd: 0 },
-        { id: 'wallet_momo', user_id: String(userId), name: 'MoMo', initial_balance_vnd: 0 }
-      ];
-    }
 
     // Chuẩn hóa dữ liệu tương thích
     transactions = transactions.map(t => ({
@@ -198,13 +190,13 @@ export async function render(container) {
     const balances = calculateWalletBalances(wallets, transactions);
     const total = calculateTotalBalance(wallets, transactions);
 
-    document.getElementById('total-balance').textContent = formatVND(total);
+    container.querySelector('#' + 'total-balance').textContent = formatVND(total);
 
     // Render danh sách ví
-    const walletList = document.getElementById('wallet-list');
+    const walletList = container.querySelector('#' + 'wallet-list');
     walletList.innerHTML = '';
     wallets.forEach(w => {
-      const b = balances[w.id] || 0;
+      const b = balances.get(w.id) || 0;
       const chip = document.createElement('div');
       chip.className = 'card';
       chip.style.padding = '12px 18px';
@@ -248,10 +240,10 @@ export async function render(container) {
   }
 
   function renderTransactionsTable(transactions, wallets) {
-    const tbody = document.getElementById('tx-table-body');
+    const tbody = container.querySelector('#' + 'tx-table-body');
     tbody.innerHTML = '';
 
-    const countTag = document.getElementById('ledgerCountTag');
+    const countTag = container.querySelector('#' + 'ledgerCountTag');
     if (countTag) countTag.textContent = `${transactions.length} bản ghi`;
 
     if (transactions.length === 0) {
@@ -313,9 +305,9 @@ export async function render(container) {
   }
 
   // Thêm ví mới
-  document.getElementById('btn-create-wallet').onclick = async () => {
-    const nameInput = document.getElementById('new-wallet-name');
-    const balanceInput = document.getElementById('new-wallet-balance');
+  container.querySelector('#' + 'btn-create-wallet').onclick = async () => {
+    const nameInput = container.querySelector('#' + 'new-wallet-name');
+    const balanceInput = container.querySelector('#' + 'new-wallet-balance');
     const name = nameInput.value.trim();
     const balance = parseInt(balanceInput.value, 10) || 0;
 
@@ -329,7 +321,7 @@ export async function render(container) {
       id: generateClientUuid(),
       user_id: String(userId),
       name: name,
-      initial_balance_vnd: balance,
+      opening_balance_vnd: balance,
       created_at: new Date().toISOString()
     };
 
@@ -354,10 +346,12 @@ export async function render(container) {
     const walletId = walletSelect.value;
     const destWalletId = (type === 'transfer') ? destWalletSelect.value : null;
     const catCode = (type === 'transfer') ? null : catSelect.value;
-    const amount = parseInt(document.getElementById('tx-amount').value, 10);
-    const date = document.getElementById('tx-date').value;
-    const note = document.getElementById('tx-note').value.trim();
+    const amount = parseInt(container.querySelector('#' + 'tx-amount').value, 10);
+    const date = container.querySelector('#' + 'tx-date').value;
+    const note = container.querySelector('#' + 'tx-note').value.trim();
 
+    if (!walletId) return alert('Thêm hoặc đồng bộ ví trước khi lưu giao dịch.');
+    if (!Number.isSafeInteger(amount) || amount <= 0) return alert('Số tiền phải là số nguyên dương.');
     if (type === 'transfer' && walletId === destWalletId) {
       alert('Ví nhận tiền phải khác ví chuyển.');
       return;
@@ -397,7 +391,7 @@ export async function render(container) {
     if (!t) return;
 
     editingId = id;
-    document.getElementById('form-title').innerHTML = `<i class="ri-edit-line"></i> Sửa giao dịch (#${id.slice(0, 8)})`;
+    container.querySelector('#' + 'form-title').innerHTML = `<i class="ri-edit-line"></i> Sửa giao dịch (#${id.slice(0, 8)})`;
     typeSelect.value = t.type;
     updateCategorySelect();
 
@@ -409,9 +403,9 @@ export async function render(container) {
       catSelect.value = t.category_code;
     }
 
-    document.getElementById('tx-amount').value = t.amount_vnd;
-    document.getElementById('tx-date').value = t.occurred_on;
-    document.getElementById('tx-note').value = t.note;
+    container.querySelector('#' + 'tx-amount').value = t.amount_vnd;
+    container.querySelector('#' + 'tx-date').value = t.occurred_on;
+    container.querySelector('#' + 'tx-note').value = t.note;
 
     btnCancel.style.display = 'inline-block';
   }
@@ -430,9 +424,9 @@ export async function render(container) {
 
   function resetForm() {
     editingId = null;
-    document.getElementById('form-title').innerHTML = '<i class="ri-add-box-line"></i> Thêm giao dịch / Chuyển ví';
+    container.querySelector('#' + 'form-title').innerHTML = '<i class="ri-add-box-line"></i> Thêm giao dịch / Chuyển ví';
     form.reset();
-    document.getElementById('tx-date').value = today;
+    container.querySelector('#' + 'tx-date').value = today;
     typeSelect.value = 'expense';
     updateCategorySelect();
     btnCancel.style.display = 'none';
