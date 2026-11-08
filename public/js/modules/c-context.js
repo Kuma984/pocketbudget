@@ -30,19 +30,41 @@ export function assertCSession(expected) {
   if (!expected || session?.user.id !== expected.user.id) throw new Error('Tài khoản đã thay đổi. Mở lại màn hình.');
 }
 
+// Tổng quan, Thu chi và Ngân sách dùng localStorage['pocketbudget_cached_user'] khi không gọi được
+// máy chủ; đăng xuất xóa khóa này. Phần C dùng cùng danh tính để đọc đúng phân vùng dữ liệu.
+const APP_USER_KEY = 'pocketbudget_cached_user';
+function readAppCachedUser() {
+  try {
+    const cached = JSON.parse(localStorage.getItem(APP_USER_KEY));
+    const id = String(cached?.id ?? '');
+    return /^[1-9][0-9]{0,19}$/.test(id) ? { id, name: cached.name ?? '', email: cached.email ?? '' } : null;
+  } catch { return null; }
+}
+function offlineSession() {
+  const cached = readAppCachedUser();
+  if (!cached) {
+    clearCSession();
+    return null;
+  }
+  if (session?.user.id !== cached.id) setCSession({ user: cached });
+  session = { user: session.user, csrf_token: null };
+  return session;
+}
+
 export async function getCSession() {
   if (navigator.onLine === false) {
-    if (session) return session;
-    throw new Error('Hãy đăng nhập trực tuyến trước khi dùng dữ liệu cá nhân.');
+    const local = offlineSession();
+    if (local) return local;
+    throw new Error('Hãy đăng nhập trực tuyến một lần trên máy này trước khi dùng dữ liệu cá nhân khi offline.');
   }
   try {
     const result = setCSession(await apiRequest('auth.php?action=me'));
     if (!result) throw new Error('Chưa xác định được tài khoản. Hãy đăng nhập.');
     return result;
   } catch (error) {
-    if (error instanceof TypeError && session) {
-      session = { user: session.user, csrf_token: null };
-      return session;
+    if (error instanceof TypeError) {
+      const local = offlineSession();
+      if (local) return local;
     }
     clearCSession();
     if ([501, 503].includes(error.status) && ['NOT_IMPLEMENTED', 'FRONTEND_PREVIEW_ONLY'].includes(error.code)) {

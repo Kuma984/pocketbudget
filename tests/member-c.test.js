@@ -6,8 +6,11 @@ const wallet = { id: 'w1', opening_balance_vnd: 1000000 };
 const food = { type: 'expense', amount_vnd: 45000, occurred_on: '2026-11-06', category_code: 'food', sync_status: 'pending' };
 test('overview keeps negative budgets, excludes transfers and computes days inclusive', () => {
   const rows = [food, { ...food, type: 'transfer' }, { ...food, deleted_at: '2026-11-06' }];
-  assert.deepEqual(readLocalOverview([wallet], rows, [{ month: '2026-11', limit_vnd: 10000 }], '2026-11-06'),
+  const overview = readLocalOverview([wallet], rows, [{ month: '2026-11', limit_vnd: 10000 }], '2026-11-06');
+  assert.deepEqual({ balance: overview.balance, remaining: overview.remaining, days: overview.days },
     { balance: 955000, remaining: -35000, days: 25 });
+  assert.equal(overview.state, 'over');
+  assert.equal(overview.pending, 2); // food + transfer đang pending; bản đã xóa không tính
 });
 
 test('summary respects selected month and category, including pending data', () => {
@@ -72,4 +75,37 @@ test('rejected invalid draft makes no shared ledger write', async () => {
     save: async () => { saved = true; },
   }), /Chọn một ví/);
   assert.equal(saved, false);
+});
+
+import { describeSpendingCapacity } from '../public/js/modules/c-tools.js';
+import { simulatePurchase } from '../public/js/domain/finance.js';
+
+// money() dùng Intl vi-VN: dấu cách trước ₫ là NBSP, nên so sánh sau khi chuẩn hóa khoảng trắng.
+const plain = text => text.replace(/\s/g, ' ');
+const capacityRow = input => {
+  const r = simulatePurchase(input);
+  return ['before', 'after'].map(side => plain(describeSpendingCapacity(r[`flexible_${side}_vnd`], r[`daily_${side}_vnd`]).text));
+};
+
+test('khả năng chi tiêu: âm hiện tổng tiền thiếu, không chia theo ngày', () => {
+  // 23 ngày, tiền linh hoạt −500.000 trước và −900.000 nếu mua (trước đây hiện −39.131 ₫/ngày).
+  const row = capacityRow({ balance_vnd: 1000000, budget_remaining_vnd: -500000, price_vnd: 400000, days_remaining: 23 });
+  assert.deepEqual(row, ['Thiếu 500.000 ₫', 'Thiếu 900.000 ₫']);
+});
+
+test('khả năng chi tiêu: trước khi mua còn chi được mỗi ngày, sau khi mua thì thiếu', () => {
+  const row = capacityRow({ balance_vnd: 3000000, budget_remaining_vnd: 2500000, price_vnd: 3000000, days_remaining: 23 });
+  assert.deepEqual(row, ['Có thể chi khoảng 108.695 ₫/ngày', 'Thiếu 500.000 ₫']);
+});
+
+test('khả năng chi tiêu: bằng 0 không hiện mức chi/ngày', () => {
+  const row = capacityRow({ balance_vnd: 1000000, budget_remaining_vnd: 400000, price_vnd: 400000, days_remaining: 10 });
+  assert.deepEqual(row, ['Có thể chi khoảng 40.000 ₫/ngày', 'Không còn tiền linh hoạt để chi']);
+});
+
+test('khả năng chi tiêu: tiền thiếu lấy từ tiền linh hoạt, không lấy từ số dư', () => {
+  // Số dư sau mua còn dương (100.000) nhưng tiền giữ riêng 300.000 → linh hoạt −200.000.
+  const r = simulatePurchase({ balance_vnd: 500000, budget_remaining_vnd: 5000000, price_vnd: 400000, days_remaining: 5, reserved_vnd: 300000 });
+  assert.equal(r.balance_after_vnd, 100000);
+  assert.equal(plain(describeSpendingCapacity(r.flexible_after_vnd, r.daily_after_vnd).text), 'Thiếu 200.000 ₫');
 });

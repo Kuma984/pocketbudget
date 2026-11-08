@@ -45,7 +45,7 @@ export async function saveConfirmedDraft(input, { current, wishlistId = null, tr
 export async function renderDraft(container, { current, draft, wishlistId = null, onSaved = () => {} }) {
   const root = el('section', null, { class: 'c-entry' });
   container.replaceChildren(root);
-  const status = el('p', 'Đang lấy danh sách ví…', { role: 'status' });
+  const status = el('p', 'Đang lấy danh sách ví…', { role: 'status', class: 'c-status' });
   const close = action('Đóng');
   close.addEventListener('click', () => root.remove());
   root.append(el('h3', 'Xác nhận bản nháp giao dịch'), status);
@@ -59,7 +59,7 @@ export async function renderDraft(container, { current, draft, wishlistId = null
     return;
   }
   if (!root.isConnected) return;
-  const form = el('form', null, { class: 'c-grid' });
+  const form = el('form', null, { class: 'form c-grid' });
   const type = field(form, 'Loại', 'draft-type', { tag: 'select', required: '' });
   addOption(type, '', 'Chọn loại');
   addOption(type, 'income', 'Thu nhập'); addOption(type, 'expense', 'Chi tiêu'); addOption(type, 'transfer', 'Chuyển ví');

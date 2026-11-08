@@ -10,10 +10,12 @@ function worker({ available = [], network = async () => { throw new Error('offli
   const handlers = {};
   const responses = new Map(available.map(path => [new URL(path, origin).href, path]));
   const cached = [];
-  const self = { registration: { scope: origin + '/' }, location: { origin },
+  const self = { registration: { scope: origin + '/' }, location: { origin }, skipWaiting: () => {},
     addEventListener: (event, handler) => { handlers[event] = handler; } };
   const cache = {
     addAll: async assets => cached.push(...assets),
+    add: async asset => { cached.push(asset); },
+    put: async () => {},
     match: async (request, options) => {
       const url = new URL(request.url ?? request, origin);
       if (options?.ignoreSearch) url.search = '';
@@ -48,4 +50,12 @@ test('offline route reload serves the app shell; requests to PHP are not interce
   assert.equal(await instance.request('/index.html'), '/index.html');
   assert.equal(instance.request('/api/snapshot.php'), undefined);
   assert.equal(instance.request('/api/chat.php', 'cors', 'POST'), undefined);
+});
+
+test('static CSS/JS prefer the network so an old cached stylesheet is not kept online', async () => {
+  const fresh = { status: 200, clone() { return this; }, body: 'fresh' };
+  const online = worker({ available: ['/css/member-c.css'], network: async () => fresh });
+  assert.equal(await online.request('/css/member-c.css?v=19', 'no-cors'), fresh);
+  const offline = worker({ available: ['/css/member-c.css'] });
+  assert.equal(await offline.request('/css/member-c.css?v=19', 'no-cors'), '/css/member-c.css');
 });

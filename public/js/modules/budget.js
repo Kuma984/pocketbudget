@@ -1,20 +1,59 @@
 // Ghép nối Module Ngân Sách (Thành viên B — B02) với IndexedDB & Đồng bộ
 import { listRecords, saveAndQueue, generateClientUuid } from '../db.js';
-import { formatVND } from '../domain/finance.js';
+import { formatVND, getMonthBudgetStatus, isValidAmount } from '../domain/finance.js';
 import { apiRequest } from '../api.js';
 
-export async function render(container) {
-  let currentUser = null;
+/** Tháng hiện tại theo ngày địa phương, dạng YYYY-MM. */
+export function currentMonthKey(now = new Date()) {
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
+
+/** Cùng cách xác định user với Tổng quan/Thu chi: phiên máy chủ, nếu không gọi được thì user đã lưu trên máy. */
+export async function resolveLocalUserId() {
   try {
     const res = await apiRequest('auth.php?action=me');
-    currentUser = res.user;
-  } catch {
-    currentUser = null;
-  }
-  const userId = currentUser ? currentUser.id : '1';
+    if (res.user) {
+      localStorage.setItem('pocketbudget_cached_user', JSON.stringify(res.user));
+      return String(res.user.id);
+    }
+  } catch { /* Dùng user đã lưu bên dưới. */ }
+  try {
+    const cached = JSON.parse(localStorage.getItem('pocketbudget_cached_user'));
+    if (cached?.id) return String(cached.id);
+  } catch { /* Không có user đã lưu. */ }
+  return '1';
+}
 
-  const today = new Date();
-  const currentMonthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+/**
+ * Đường ghi hạn mức duy nhất: tab Ngân sách và nút "Đặt Ngân Sách" đều gọi hàm này.
+ * Ghi vào IndexedDB + outbox trong một transaction, nên Tổng quan và Mô phỏng thấy ngay trên máy.
+ */
+export async function saveMonthBudget(userId, month, limit) {
+  if (!isValidAmount(limit)) throw new Error('Hạn mức phải là số nguyên dương.');
+  const budgets = await listRecords('budgets', userId);
+  const status = getMonthBudgetStatus(budgets, [], month);
+  const existing = status.budget_id ? budgets.find(b => b.id === status.budget_id) : null;
+  const record = {
+    id: existing ? existing.id : generateClientUuid(),
+    month,
+    limit_vnd: limit,
+    updated_at: new Date().toISOString(),
+  };
+  return saveAndQueue({
+    user_id: userId, entity: 'budget', action: 'upsert', record,
+    base_version: existing ? (existing.version || 0) : 0,
+  });
+}
+
+/** Hạn mức đang lưu của tháng (null nếu chưa đặt), đọc từ cùng nguồn với Tổng quan và Mô phỏng. */
+export async function readMonthBudgetLimit(userId, month) {
+  const budgets = await listRecords('budgets', userId);
+  return getMonthBudgetStatus(budgets, [], month).limit_vnd;
+}
+
+export async function render(container) {
+  const userId = await resolveLocalUserId();
+  const monthKey = currentMonthKey();
 
   container.innerHTML = `
     <div class="budget-screen">
@@ -23,7 +62,7 @@ export async function render(container) {
         <p class="section-desc">Thiết lập hạn mức chi tiêu để kiểm soát tài chính sinh viên thông minh và nhận cảnh báo khi bội chi.</p>
 
         <div style="background:var(--bg); border:1px solid var(--line-strong); padding:18px; border-radius:var(--radius-sm);">
-          <h3 style="margin-top:0; font-size:1rem;">Hạn mức tháng hiện tại (${currentMonthKey})</h3>
+          <h3 style="margin-top:0; font-size:1rem;">Hạn mức tháng hiện tại (${monthKey})</h3>
           
           <form id="form-set-budget" style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap;">
             <div class="field" style="flex:2; min-width:220px;">
@@ -35,6 +74,7 @@ export async function render(container) {
             </button>
           </form>
           <div id="budget-msg" style="margin-top:10px; font-size:13px;"></div>
+          <p id="budget-status" style="margin:10px 0 0; font-size:0.88rem;"></p>
         </div>
       </section>
 
@@ -65,12 +105,23 @@ export async function render(container) {
     const budgets = await listRecords('budgets', userId);
     const transactions = await listRecords('transactions', userId);
 
-    const activeBudget = budgets.find(b => b.month === currentMonthKey);
     const limitInput = container.querySelector('#budget-limit-input');
-    if (activeBudget) {
-      limitInput.value = activeBudget.limit_vnd;
+    const statusEl = container.querySelector('#budget-status');
+    let current;
+    try {
+      current = getMonthBudgetStatus(budgets, transactions, monthKey);
+    } catch {
+      statusEl.innerHTML = '<span style="color:#b91c1c;">Có giao dịch hoặc hạn mức không hợp lệ trong sổ trên máy.</span>';
+      return;
+    }
+    // Chỉ điền hạn mức đã lưu; chưa đặt thì để trống thay vì tự điền số mặc định.
+    if (document.activeElement !== limitInput) limitInput.value = current.limit_vnd ?? '';
+    if (current.state === 'unset') {
+      statusEl.textContent = `Chưa đặt hạn mức tháng ${monthKey}. Đã chi ${formatVND(current.spent_vnd)}.`;
     } else {
-      limitInput.value = Number(localStorage.getItem('user_monthly_budget')) || 3000000;
+      const label = current.state === 'over' ? 'Vượt ngân sách' : current.state === 'zero' ? 'Còn đúng 0đ' : 'Ngân sách còn lại';
+      statusEl.innerHTML = `${label}: <b style="color:${current.state === 'ok' ? '#15803d' : '#b91c1c'};">${formatVND(current.remaining_vnd)}</b>`
+        + ` = hạn mức ${formatVND(current.limit_vnd)} − đã chi ${formatVND(current.spent_vnd)}`;
     }
 
     // Render bảng lịch sử
@@ -78,22 +129,22 @@ export async function render(container) {
     tbody.innerHTML = '';
 
     const monthsSet = new Set(budgets.map(b => b.month));
-    monthsSet.add(currentMonthKey);
+    monthsSet.add(monthKey);
     const months = Array.from(monthsSet).sort().reverse();
 
     months.forEach(m => {
-      const bObj = budgets.find(b => b.month === m);
-      const limit = bObj ? bObj.limit_vnd : (m === currentMonthKey ? Number(limitInput.value) : 0);
-
-      const spent = transactions
-        .filter(t => t.type === 'expense' && (t.occurred_on || t.date || '').startsWith(m))
-        .reduce((sum, t) => sum + Number(t.amount_vnd || t.amount || 0), 0);
+      let row;
+      try { row = getMonthBudgetStatus(budgets, transactions, m); } catch { return; }
+      const limit = row.limit_vnd ?? 0;
+      const spent = row.spent_vnd;
 
       const ratio = limit > 0 ? (spent / limit) : 0;
       const percent = Math.round(ratio * 100);
 
       let statusBadge = '';
-      if (ratio > 1) {
+      if (row.state === 'unset') {
+        statusBadge = `<span style="background:#f1f5f9; color:#475569; padding:3px 8px; border-radius:12px; font-size:12px; font-weight:600;">Chưa đặt hạn mức</span>`;
+      } else if (ratio > 1) {
         statusBadge = `<span style="background:#fee2e2; color:#b91c1c; padding:3px 8px; border-radius:12px; font-size:12px; font-weight:600;">Vượt mức (${percent}%)</span>`;
       } else if (ratio >= 0.8) {
         statusBadge = `<span style="background:#fef3c7; color:#b45309; padding:3px 8px; border-radius:12px; font-size:12px; font-weight:600;">Cảnh báo (${percent}%)</span>`;
@@ -105,7 +156,7 @@ export async function render(container) {
       tbody.innerHTML += `
         <tr style="border-bottom:1px solid #eee;">
           <td style="padding:10px; font-weight:600;">${m}</td>
-          <td style="padding:10px; text-align:right;">${formatVND(limit)}</td>
+          <td style="padding:10px; text-align:right;">${row.limit_vnd === null ? '—' : formatVND(limit)}</td>
           <td style="padding:10px; text-align:right; font-weight:bold; color:${isOver ? '#b91c1c' : '#15803d'};">${formatVND(spent)}</td>
           <td style="padding:10px; text-align:center;">${statusBadge}</td>
         </tr>
@@ -125,26 +176,8 @@ export async function render(container) {
     }
 
     try {
-      const budgets = await listRecords('budgets', userId);
-      const existing = budgets.find(b => b.month === currentMonthKey);
-
-      const budgetRecord = {
-        id: existing ? existing.id : generateClientUuid(),
-        month: currentMonthKey,
-        limit_vnd: limit,
-        version: existing ? (existing.version || 1) : 1
-      };
-
-      await saveAndQueue({
-        user_id: userId,
-        entity: 'budget',
-        action: 'upsert',
-        record: budgetRecord,
-        base_version: existing ? (existing.version || 0) : 0
-      });
-
-      localStorage.setItem('user_monthly_budget', limit);
-      msg.innerHTML = '<span style="color:#15803d;">Đã lưu ngân sách và đưa vào hàng chờ đồng bộ thành công!</span>';
+      await saveMonthBudget(userId, monthKey, limit);
+      msg.innerHTML = '<span style="color:#15803d;">Đã lưu hạn mức trên máy và đưa vào hàng chờ đồng bộ.</span>';
       await loadBudgetInfo();
       setTimeout(() => { msg.innerHTML = ''; }, 3000);
     } catch (err) {

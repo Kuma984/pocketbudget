@@ -1,4 +1,4 @@
-import { calculateTotalBalance, getMonthTotals, isValidAmount } from '../domain/finance.js';
+import { calculateTotalBalance, daysLeftInMonth, getMonthBudgetStatus, getMonthTotals, isValidAmount } from '../domain/finance.js';
 import { CATEGORIES } from '../config.js';
 
 export const categoryLabels = {
@@ -30,16 +30,37 @@ export function resolveMonth(period, today = todayLocal()) {
 }
 
 export function readLocalOverview(wallets, transactions, budgets, today = todayLocal()) {
-  const balance = calculateTotalBalance(wallets, transactions);
+  const activeWallets = wallets.filter(row => !row.deleted_at);
+  const activeTransactions = transactions.filter(row => !row.deleted_at);
+  const balance = calculateTotalBalance(activeWallets, activeTransactions);
   if (!Number.isSafeInteger(balance)) throw new Error('Số dư vượt giới hạn tính toán.');
   const month = today.slice(0, 7);
-  const budget = budgets.find(row => row.month === month && !row.deleted_at);
-  const expense = getMonthTotals(transactions, month).expense_vnd;
-  if (budget && !isValidAmount(budget.limit_vnd)) throw new Error('Hạn mức không hợp lệ.');
-  const remaining = budget ? budget.limit_vnd - expense : null;
-  if (remaining !== null && !Number.isSafeInteger(remaining)) throw new Error('Ngân sách vượt giới hạn tính toán.');
-  const [y, m, d] = today.split('-').map(Number);
-  return { balance, remaining, days: new Date(y, m, 0).getDate() - d + 1 };
+  let status;
+  try {
+    status = getMonthBudgetStatus(budgets, activeTransactions, month);
+  } catch {
+    throw new Error('Có giao dịch hoặc hạn mức tháng ' + month + ' không hợp lệ trong sổ trên máy.');
+  }
+  const pending = [...activeWallets, ...activeTransactions, ...budgets]
+    .filter(row => row.sync_status && row.sync_status !== 'synced').length;
+  return {
+    balance, remaining: status.remaining_vnd, days: daysLeftInMonth(today),
+    month, limit: status.limit_vnd, spent: status.spent_vnd, state: status.state,
+    wallet_count: activeWallets.length, pending,
+  };
+}
+
+/**
+ * Chữ cho dòng "Khả năng chi tiêu" của bảng Mô phỏng. Chỉ đổi cách hiển thị, không đổi công thức:
+ * - tiền linh hoạt dương: dùng mức/ngày simulatePurchase đã tính (làm tròn xuống như cũ);
+ * - bằng 0: không còn tiền linh hoạt;
+ * - âm: tổng số tiền thiếu = |tiền linh hoạt|, không chia theo ngày (chia ra dễ hiểu nhầm là "được chi âm mỗi ngày").
+ * Số thiếu lấy từ tiền linh hoạt chứ không từ số dư, vì tiền giữ riêng hoặc ngân sách thấp hơn có thể là giới hạn.
+ */
+export function describeSpendingCapacity(flexible_vnd, daily_vnd) {
+  if (flexible_vnd > 0) return { tone: 'ok', text: `Có thể chi khoảng ${money(daily_vnd)}/ngày`, daily: money(daily_vnd) };
+  if (flexible_vnd === 0) return { tone: 'zero', text: 'Không còn tiền linh hoạt để chi' };
+  return { tone: 'short', text: `Thiếu ${money(Math.abs(flexible_vnd))}` };
 }
 
 export function expenseSummary(rows, period, category = null, today = todayLocal()) {
@@ -80,16 +101,21 @@ export function el(tag, value, attributes = {}) {
 }
 
 export function field(form, label, name, options = {}) {
-  const wrap = el('label', label, { class: 'c-field' });
+  const wrap = el('label', null, { class: 'field c-field' });
+  const caption = el('span', label, { class: 'c-label' });
   const { tag = 'input', value = '', ...attributes } = options;
+  // Luôn có type cho input: style chung chỉ áp cho input[type=text|number|date…].
+  if (tag === 'input' && !attributes.type) attributes.type = 'text';
+  if (tag === 'select' && !attributes.class) attributes.class = 'select-field';
   const input = el(tag, null, { name, ...attributes });
   input.value = value;
-  wrap.append(input);
+  wrap.append(caption, input);
   form.append(wrap);
   return input;
 }
 
-export const action = (label, type = 'button') => el('button', label, { type });
+export const action = (label, type = 'button', variant = type === 'submit' ? 'primary' : 'secondary') =>
+  el('button', label, { type, class: variant === 'primary' ? 'primary c-btn' : 'btn-secondary c-btn' });
 export function say(target, message, error = false) {
   target.textContent = message;
   target.classList.toggle('c-error', error);

@@ -1,6 +1,6 @@
 // Dashboard Module - Netlify Cute Cat Meme Edition (Thành viên B) tích hợp với Đồng bộ & IndexedDB (Thành viên A)
 import { listRecords, saveAndQueue } from '../db.js';
-import { calculateWalletBalances, calculateTotalBalance, formatVND } from '../domain/finance.js';
+import { calculateWalletBalances, calculateTotalBalance, dailyAllowance, daysLeftInMonth, formatVND, getMonthBudgetStatus, getMonthTotals } from '../domain/finance.js';
 import { apiRequest } from '../api.js';
 
 let activeWalletFilter = 'all';
@@ -27,13 +27,14 @@ export async function render(container) {
     <!-- THẺ NGÂN SÁCH CHÍNH (SỐ BỰ ĐÙNG VỚI THANH TIẾN ĐỘ) -->
     <section class="hero" id="heroCard">
       <div class="hero-header">
-        <p class="hero-label">Ngân sách còn lại trong tháng</p>
-        <span class="badge-remaining">Ban đầu: <b id="totalBudgetInitial">3.000.000 ₫</b></span>
+        <p class="hero-label" id="heroBudgetLabel">Ngân sách còn lại trong tháng</p>
+        <span class="badge-remaining">Hạn mức: <b id="totalBudgetInitial">—</b></span>
       </div>
       
       <div class="hero-amount-row">
         <div class="hero-amount" id="totalBalance">0 ₫</div>
       </div>
+      <p class="hero-sub" id="heroBudgetNote" style="margin-top:2px;">Hạn mức tháng − tổng chi tháng, tính trên tất cả ví.</p>
 
       <!-- Thanh Ngân Sách Đã Dùng % Màu Vàng -->
       <div class="budget-progress-box">
@@ -47,9 +48,10 @@ export async function render(container) {
       </div>
 
       <p class="hero-sub">Mỗi ngày được tiêu: <span id="dailyBudget" style="font-weight:700; color:var(--primary);">0đ</span></p>
+      <p class="hero-sub"><span id="walletBalanceLabel">Số dư hiện tại (tất cả ví)</span>: <b id="walletBalanceValue">0đ</b></p>
       <div class="hero-chips">
-        <span class="chip pos"><i class="ri-arrow-down-line"></i> Thu: <b id="totalIncome">0đ</b></span>
-        <span class="chip neg"><i class="ri-arrow-up-line"></i> Chi: <b id="totalExpenseChip">0đ</b></span>
+        <span class="chip pos"><i class="ri-arrow-down-line"></i> Thu tháng này: <b id="totalIncome">0đ</b></span>
+        <span class="chip neg"><i class="ri-arrow-up-line"></i> Chi tháng này: <b id="totalExpenseChip">0đ</b></span>
       </div>
     </section>
 
@@ -157,42 +159,78 @@ export async function render(container) {
       ? allTxs
       : allTxs.filter(t => t.wallet === activeWalletFilter || t.wallet_id === activeWalletFilter);
 
-    // Tính toán số dư
-    const monthlyBudget = Number(localStorage.getItem('user_monthly_budget')) || 3000000;
+    // Ngân sách và số dư dùng hàm chung trong domain/finance.js, cùng nguồn với tab Ngân sách và Mô phỏng.
+    const budgets = await listRecords('budgets', userId);
+    const now = new Date();
+    const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const monthKey = todayKey.slice(0, 7);
+    const scopeTxs = activeWalletFilter === 'all'
+      ? rawTxs
+      : rawTxs.filter(t => t.wallet_id === activeWalletId(wallets) || (t.type === 'transfer' && t.destination_wallet_id === activeWalletId(wallets)));
 
-    let totalIncome = 0;
-    let totalExpense = 0;
-    let todayExp = 0;
-    const todayStr = new Date().toDateString();
+    let status = null;
+    let monthScope = { income_vnd: 0, expense_vnd: 0 };
+    let dataError = false;
+    try {
+      // Ngân sách là hạn mức chung của tài khoản: luôn tính trên tất cả ví.
+      status = getMonthBudgetStatus(budgets, rawTxs, monthKey);
+      monthScope = getMonthTotals(scopeTxs.filter(t => !(t.type === 'transfer')), monthKey);
+    } catch {
+      dataError = true;
+    }
 
-    filteredTxs.forEach(t => {
-      const amt = t.amount;
-      if (t.type === 'income') {
-        totalIncome += amt;
-      } else if (t.type === 'expense') {
-        totalExpense += amt;
-        if (new Date(t.date).toDateString() === todayStr) {
-          todayExp += amt;
-        }
-      }
-    });
+    const [, mm] = monthKey.split('-');
+    container.querySelector('#heroBudgetLabel').textContent = `Ngân sách còn lại tháng ${Number(mm)}/${now.getFullYear()}`;
+    const amountEl = container.querySelector('#totalBalance');
+    const noteEl = container.querySelector('#heroBudgetNote');
+    const remainingDays = daysLeftInMonth(todayKey);
 
-    // Ngân sách còn lại trong tháng = Ngân sách gốc + Thu nhập - Chi tiêu
-    const currentRemaining = monthlyBudget + totalIncome - totalExpense;
+    if (dataError) {
+      amountEl.textContent = 'Lỗi dữ liệu';
+      noteEl.textContent = 'Có giao dịch hoặc hạn mức không hợp lệ trong sổ trên máy.';
+    } else if (status.state === 'unset') {
+      amountEl.textContent = 'Chưa đặt hạn mức';
+      amountEl.style.fontSize = '1.6rem';
+      noteEl.innerHTML = `Đã chi tháng này ${formatVND(status.spent_vnd)}. <a href="#budget">Đặt hạn mức</a> để theo dõi ngân sách còn lại.`;
+    } else {
+      amountEl.style.fontSize = '';
+      animateCountUp(status.remaining_vnd, 'totalBalance');
+      noteEl.textContent = status.state === 'over'
+        ? `Đã vượt hạn mức ${formatVND(-status.remaining_vnd)}. Tính trên tất cả ví.`
+        : status.state === 'zero'
+          ? 'Đã dùng hết hạn mức tháng này. Tính trên tất cả ví.'
+          : 'Hạn mức tháng − tổng chi tháng, tính trên tất cả ví.';
+    }
+    const limit = status?.limit_vnd ?? null;
+    const spent = status?.spent_vnd ?? 0;
+    container.querySelector('#totalBudgetInitial').textContent = limit === null ? 'chưa đặt' : formatVND(limit);
+    container.querySelector('#totalIncome').textContent = formatVND(monthScope.income_vnd);
+    container.querySelector('#totalExpenseChip').textContent = formatVND(monthScope.expense_vnd);
 
-    // Hiệu ứng nhảy số mượt mà
-    animateCountUp(currentRemaining, 'totalBalance');
-    container.querySelector('#totalBudgetInitial').textContent = formatVND(monthlyBudget);
-    container.querySelector('#totalIncome').textContent = formatVND(totalIncome);
-    container.querySelector('#totalExpenseChip').textContent = formatVND(totalExpense);
-
-    // Tính % ngân sách đã dùng
-    const usedPercent = Math.min(100, Math.max(0, Math.round((totalExpense / (monthlyBudget + totalIncome)) * 100))) || 0;
-    container.querySelector('#budgetPercentText').textContent = `${usedPercent}%`;
-    container.querySelector('#budgetUsedAmountText').textContent = `${formatVND(totalExpense)} / ${formatVND(monthlyBudget + totalIncome)}`;
+    // % hạn mức đã dùng (tổng chi tháng / hạn mức). Thu nhập không cộng vào hạn mức.
+    const usedPercent = limit ? Math.min(100, Math.max(0, Math.round((spent / limit) * 100))) : 0;
+    container.querySelector('#budgetPercentText').textContent = limit ? `${Math.round((spent / limit) * 100)}%` : '—';
+    container.querySelector('#budgetUsedAmountText').textContent = limit ? `${formatVND(spent)} / ${formatVND(limit)}` : `${formatVND(spent)} / chưa đặt`;
     container.querySelector('#budgetProgressBar').style.width = `${usedPercent}%`;
 
+    // Số dư thật trong ví: số dư ban đầu + thu − chi; chuyển ví không đổi tổng.
+    const walletLabelEl = container.querySelector('#walletBalanceLabel');
+    const walletValueEl = container.querySelector('#walletBalanceValue');
+    if (activeWalletFilter === 'all') {
+      walletLabelEl.textContent = `Số dư hiện tại (tất cả ${wallets.length} ví)`;
+      walletValueEl.textContent = formatVND(calculateTotalBalance(wallets, rawTxs));
+    } else {
+      const id = activeWalletId(wallets);
+      const w = wallets.find(row => row.id === id);
+      walletLabelEl.textContent = `Số dư hiện tại (${w ? w.name : 'ví đã chọn'})`;
+      walletValueEl.textContent = formatVND(calculateWalletBalances(wallets, rawTxs).get(id) ?? 0);
+    }
+
     // Cập nhật trạng thái hôm nay trên topbar
+    let todayExp = 0;
+    rawTxs.forEach(t => {
+      if (!t.deleted_at && t.type === 'expense' && t.occurred_on === todayKey) todayExp += Number(t.amount_vnd) || 0;
+    });
     const todayStatusEl = document.getElementById('todayExpenseStatus');
     if (todayStatusEl) {
       if (todayExp > 0) {
@@ -204,12 +242,11 @@ export async function render(container) {
       }
     }
 
-    // Tính ngân sách mỗi ngày
-    const now = new Date();
-    const daysInMonth = new Date(currentViewYear, currentViewMonth + 1, 0).getDate();
-    const remainingDays = Math.max(1, daysInMonth - now.getDate() + 1);
-    const dailyBudget = Math.max(0, Math.round(currentRemaining / remainingDays));
-    container.querySelector('#dailyBudget').textContent = `${formatVND(dailyBudget)}/ngày (${remainingDays} ngày còn lại)`;
+    // Ngân sách mỗi ngày của tháng hiện tại, làm tròn xuống như Mô phỏng.
+    const daily = dailyAllowance(status?.remaining_vnd ?? null, remainingDays);
+    container.querySelector('#dailyBudget').textContent = daily === null
+      ? `chưa có hạn mức (${remainingDays} ngày còn lại)`
+      : `${formatVND(daily)}/ngày (${remainingDays} ngày còn lại)`;
 
     const monthNames = ['Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5', 'Tháng 6', 'Tháng 7', 'Tháng 8', 'Tháng 9', 'Tháng 10', 'Tháng 11', 'Tháng 12'];
     container.querySelector('#locketMonthTitle').textContent = `${monthNames[currentViewMonth]} ${currentViewYear}`;
@@ -219,6 +256,11 @@ export async function render(container) {
     renderWeeklyChart(filteredTxs);
     renderPieDonutChart(filteredTxs);
     renderTxList(filteredTxs, userId);
+  }
+
+  function activeWalletId(wallets) {
+    const w = wallets.find(row => row.id === activeWalletFilter || row.name === activeWalletFilter);
+    return w ? w.id : activeWalletFilter;
   }
 
   function animateCountUp(targetVal, elementId) {
